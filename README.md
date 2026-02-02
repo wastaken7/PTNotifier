@@ -30,15 +30,16 @@ For these types, the name of the cookie file does not matter, as long as it is a
 ### OTHER Trackers
 These are specific trackers that have their own dedicated module. The cookie file **must be placed in the `cookies/OTHER/` directory** and **must have a specific name** that matches the tracker's module.
 
-| Module | Website URL | Required Cookie Filename |
-| :--- | :--- | :--- |
-| `ANT.py` | `anthelion.me` | `ANT.txt` |
-| `BT.py` | `brasiltracker.org` | `BT.txt` |
-| `DC.py` | `digitalcore.club`| `DC.txt` |
-| `GPW.py` | `greatposterwall.com`| `GPW.txt` |
-| `HDS.py` | `hd-space.org`| `HDS.txt` |
-| `IS.py` | `immortalseed.me`| `IS.txt` |
-| `IPT.py` | `iptorrents.com`| `IPT.txt` |
+| Module | Website URL | Required Cookie Filename | Obersvation |
+| :--- | :--- | :--- | :--- |
+| `ANT.py` | `anthelion.me` | `ANT.txt` | |
+| `BT.py` | `brasiltracker.org` | `BT.txt` | |
+| `DC.py` | `digitalcore.club`| `DC.txt` | |
+| `GPW.py` | `greatposterwall.com`| `GPW.txt` | |
+| `HDS.py` | `hd-space.org`| `HDS.txt` | |
+| `HDT.py` | `hd-torrents.org`| `HDT.txt` | ⚠️ PTN spoofs the User-Agent for it to work. |
+| `IS.py` | `immortalseed.me`| `IS.txt` | |
+| `IPT.py` | `iptorrents.com`| `IPT.txt` | |
 
 
 ## Setup

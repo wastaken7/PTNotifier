@@ -93,7 +93,7 @@ class HDT(BaseTracker):
                     "msg": subject,
                     "date": date_str,
                     "url": link,
-                    "is_staff": "System" in sender or "(V.I.P.)" in sender,
+                    "is_staff": False,
                 }
             )
 
