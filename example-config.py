@@ -1,0 +1,18 @@
+SETTINGS = {
+    "TELEGRAM_BOT_TOKEN": "",
+    "TELEGRAM_CHAT_ID": "",
+    # Seconds between checks
+    # Make sure not to overload trackers
+    # It might get you banned!
+    # Minimum is 900 (15 minutes)
+    "CHECK_INTERVAL": 1800,
+    # Only available for some trackers
+    "MARK_AS_READ": True,
+    # HTTP request timeout in seconds
+    # Default is 30 seconds
+    # Increase if you have a slow connection or the tracker is slow
+    "TIMEOUT": 30.0,
+    # Minimum delay in seconds between requests
+    # Default is 5 seconds
+    "REQUEST_DELAY": 5.0,
+}

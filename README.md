@@ -1,0 +1,124 @@
+# PTNotifier (Private Tracker Notifier)
+
+PTNotifier is a Python-based tool designed to monitor private torrent trackers for new notifications and private messages, sending alerts to a specified Telegram chat.
+
+## How It Works
+
+The script dynamically loads tracker modules from the `trackers/` directory. For each tracker, it uses stored browser cookies to authenticate and then scrapes the notifications and messages pages for unread items. It maintains a simple state file for each tracker to keep track of processed items, ensuring that notifications are sent only once.
+
+New notifications are formatted and sent to a Telegram chat via a bot. The script runs in a continuous loop, with a configurable interval between checks.
+
+## Features
+
+-   Monitors multiple private trackers simultaneously.
+-   Sends notifications for new site alerts and private messages.
+-   Easy to configure via a `config.py` file.
+-   Uses Telegram for notifications.
+-   Dynamically loads tracker modules.
+
+## Supported Trackers
+
+Trackers are managed in three categories based on how their cookies are loaded.
+
+### AVISTAZ & UNIT3D Trackers
+These trackers share a common platform.
+-   **AVISTAZ**: For sites in the Avistaz network (e.g., Avistaz, PrivateHD, ExoticaZ). Place cookies in the `cookies/AVISTAZ/` folder.
+-   **UNIT3D**: For trackers using the UNIT3D framework. Place cookies in the `cookies/UNIT3D/` folder.
+
+For these types, the name of the cookie file does not matter, as long as it is a `.txt` file.
+
+### OTHER Trackers
+These are specific trackers that have their own dedicated module. The cookie file **must be placed in the `cookies/OTHER/` directory** and **must have a specific name** that matches the tracker's module.
+
+| Module | Website URL | Required Cookie Filename |
+| :--- | :--- | :--- |
+| `ANT.py` | `anthelion.me` | `ANT.txt` |
+| `BT.py` | `brasiltracker.org` | `BT.txt` |
+| `DC.py` | `digitalcore.club`| `DC.txt` |
+| `GPW.py` | `greatposterwall.com`| `GPW.txt` |
+| `HDS.py` | `hd-space.org`| `HDS.txt` |
+| `IS.py` | `immortalseed.me`| `IS.txt` |
+| `IPT.py` | `iptorrents.com`| `IPT.txt` |
+
+
+## Setup
+
+Follow these steps to set up PTNotifier.
+
+### 1. Prerequisites
+
+-   Python 3.8+
+-   A Telegram Bot Token and a Chat ID.
+
+### 2. Clone the Repository
+
+Clone this repository to your local machine:
+
+```bash
+git clone https://github.com/wastaken7/PTNotifier.git
+cd PTNotifier
+```
+
+### 3. Install Dependencies
+
+Install the required Python packages using pip:
+
+```bash
+pip install -r requirements.txt
+```
+
+### 4. Configure the Application
+
+Run the script:
+```bash
+python ptn.py
+```
+
+The first time you run the script, it will create a `config.py` file from `example-config.py`. You must edit this file with your settings.
+
+-   **`TELEGRAM_BOT_TOKEN`**: Your Telegram bot's API token.
+-   **`TELEGRAM_CHAT_ID`**: The ID of the Telegram chat where you want to receive notifications. You can also provide a `TELEGRAM_TOPIC_ID` if you want to send messages to a specific topic in a group.
+-   **`CHECK_INTERVAL`**: The time in seconds between checks. The minimum is 900 seconds (15 minutes) to avoid spamming trackers.
+-   **`MARK_AS_READ`**: (Optional) For some trackers, the script can attempt to mark notifications as read. Set to `True` or `False`.
+-   **`TIMEOUT`**: The timeout in seconds for network requests.
+-   **`REQUEST_DELAY`**: Delay in seconds between requests to avoid being rate-limited.
+
+### 5. Add Tracker Cookies
+
+This tool requires cookies to access your tracker accounts. You must export them from your browser in the **Netscape** format. A recommended browser extension for this is "Get cookies.txt LOCALLY" or a similar one.
+
+1.  Log into your tracker account in your browser.
+2.  Use your chosen extension to export the cookies **for that tracker's** domain as a `.txt` file.
+3.  Save the exported cookie file into the correct subdirectory based on the tracker type, following the naming rules below.
+
+-   For **AVISTAZ** or **UNIT3D** trackers, save the file in `cookies/AVISTAZ/` or `cookies/UNIT3D/`. The filename can be anything (e.g., `my_cookie.txt`).
+-   For trackers listed in the **OTHER** category, you must save the file in `cookies/OTHER/` and use the specific filename from the table (e.g., `GPW.txt` for GreatPosterWall).
+
+The final directory structure should look like this:
+```
+c:\PTNotifier\
+├───cookies\
+│   ├───AVISTAZ\
+│   │   └───avistaz_user.txt
+│   ├───OTHER\
+│   │   ├───GPW.txt
+│   │   └───ANT.txt
+│   └───UNIT3D\
+│       └───my_unit3d_site.txt
+└───...
+```
+
+## Usage
+
+Once everything is configured, you can run the notifier:
+
+```bash
+python ptn.py
+```
+
+The script will start, load all trackers with valid cookie files, and begin monitoring. The first run for each tracker will not send any notifications; it will only establish a baseline of existing items.
+
+## Disclaimer
+
+Using scripts to interact with tracker sites may be against their rules. Use this tool at your own risk. The developer is not responsible for any consequences that may arise from its use. Always respect the tracker's rules and set a reasonable `CHECK_INTERVAL` to avoid getting your account banned.
+
