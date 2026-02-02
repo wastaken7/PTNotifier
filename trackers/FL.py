@@ -27,7 +27,7 @@ class FL(BaseTracker):
     async def _parse_messages(self, url: str) -> list[dict[str, Any]]:
         """Parses message structure for FileList."""
         new_items: list[dict[str, Any]] = []
-        soup = await self._fetch_page(url)
+        soup = await self._fetch_page(url, "messages")
 
         if not soup:
             return new_items

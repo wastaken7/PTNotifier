@@ -22,7 +22,7 @@ class HDS(BaseTracker):
     async def _fetch_items(self) -> list[dict[str, Any]]:
         """Fetch messages from HD-Space mailbox."""
         if not self.state.get("notifications_url"):
-            soup = await self._fetch_page(self.base_url)
+            soup = await self._fetch_page(self.base_url, "notifications")
             if soup:
                 user_cp_link = soup.find("a", href=lambda h: h and "page=usercp&uid=" in h)
                 if user_cp_link:
@@ -42,7 +42,7 @@ class HDS(BaseTracker):
     async def _parse_messages(self, url: str) -> list[dict[str, Any]]:
         """Parses the XBTIT style message table for HD-Space."""
         new_items: list[dict[str, Any]] = []
-        soup = await self._fetch_page(url)
+        soup = await self._fetch_page(url, "messages")
 
         form = soup.find("form", attrs={"name": "deleteall"}) if soup else None
         if not form:

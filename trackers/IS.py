@@ -28,7 +28,7 @@ class IS(BaseTracker):
     async def _parse_messages(self, url: str) -> list[dict[str, Any]]:
         """Parses message rows for ImmortalSeed structure."""
         new_items: list[dict[str, Any]] = []
-        soup = await self._fetch_page(url)
+        soup = await self._fetch_page(url, "messages")
 
         if not soup or not soup.find("form", attrs={"name": "messageform"}):
             return new_items

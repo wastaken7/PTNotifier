@@ -36,7 +36,7 @@ class UNIT3D(BaseTracker):
         if self.notifications_url and self.messages_url:
             return
 
-        soup = await self._fetch_page(self.base_url)
+        soup = await self._fetch_page(self.base_url, "user ID")
         if not soup:
             console.print(f"{self.domain}: [bold red]Initialization failed.[/bold red]")
             return
@@ -64,10 +64,10 @@ class UNIT3D(BaseTracker):
             return href
         return f"{self.base_url.rstrip('/')}/{href.lstrip('/')}"
 
-    async def _fetch_and_parse(self, url: str, parse_func: Callable):
+    async def _fetch_and_parse(self, url: str, parse_func: Callable, request_type: str):
         if not url:
             return []
-        soup = await self._fetch_page(url)
+        soup = await self._fetch_page(url, request_type)
         if soup:
             return parse_func(soup)
         return []
@@ -168,8 +168,8 @@ class UNIT3D(BaseTracker):
     async def _fetch_items(self) -> list[dict[str, Any]]:
         """Fetch all new items from the tracker."""
         await self.initialize()
-        notifs = await self._fetch_and_parse(self.notifications_url, self._parse_notifications_html)
-        msgs = await self._fetch_and_parse(self.messages_url, self._parse_messages_html)
+        notifs = await self._fetch_and_parse(self.notifications_url, self._parse_notifications_html, "notifications")
+        msgs = await self._fetch_and_parse(self.messages_url, self._parse_messages_html, "messages")
         return notifs + msgs
 
     async def _ack_item(self, item: dict[str, Any]) -> None:

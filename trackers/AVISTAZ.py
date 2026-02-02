@@ -30,7 +30,7 @@ class AVISTAZ(BaseTracker):
 
     async def _fetch_and_parse_notifications(self) -> list[dict[str, Any]]:
         new_items: list[dict[str, Any]] = []
-        soup = await self._fetch_page(self.notifications_url)
+        soup = await self._fetch_page(self.notifications_url, "notifications")
         if not soup:
             return new_items
 
@@ -71,7 +71,7 @@ class AVISTAZ(BaseTracker):
 
     async def _fetch_and_parse_messages(self) -> list[dict[str, Any]]:
         new_items: list[dict[str, Any]] = []
-        soup = await self._fetch_page(self.messages_url)
+        soup = await self._fetch_page(self.messages_url, "messages")
         if not soup:
             return new_items
 

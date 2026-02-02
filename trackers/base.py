@@ -42,7 +42,7 @@ class BaseTracker(ABC):
         except (ValueError, TypeError):
             min_run_interval = 1800.0
 
-        self.should_run = time.time() - self.state.get("last_run", 0) > min_run_interval
+        self.should_run = time.time() - self.state.get("last_run", 0) >= min_run_interval
 
         self.cookie_jar = MozillaCookieJar(self.cookie_path)
         try:
@@ -145,7 +145,7 @@ class BaseTracker(ABC):
             console.print(f"[bold red]Error reading domain from {cookie_path.name}:[/bold red] {e}")
         return ""
 
-    async def _fetch_page(self, url: str) -> Optional[BeautifulSoup]:
+    async def _fetch_page(self, url: str, request_type: str) -> Optional[BeautifulSoup]:
         try:
             delay = float(str(config.SETTINGS.get("REQUEST_DELAY", 5.0)))
             timeout = float(str(config.SETTINGS.get("TIMEOUT", 30.0)))
@@ -163,7 +163,7 @@ class BaseTracker(ABC):
             BaseTracker._last_request_time = time.monotonic()
 
             try:
-                console.print(f"{self.tracker}: [blue]Checking for notifications...[/blue]")
+                console.print(f"{self.tracker}: [blue]Checking for {request_type}...[/blue]")
                 response = await self.client.get(url, timeout=timeout)
                 response.raise_for_status()
                 return BeautifulSoup(response.text, "html.parser")

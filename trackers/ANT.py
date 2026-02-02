@@ -30,7 +30,7 @@ class ANT(BaseTracker):
     async def _parse_messages(self, url: str, is_staff: bool) -> list[dict[str, Any]]:
         """Parses all message tables for both Inbox and Staff PMs."""
         new_items: list[dict[str, Any]] = []
-        soup = await self._fetch_page(url)
+        soup = await self._fetch_page(url, "messages")
         if not soup:
             return new_items
 
