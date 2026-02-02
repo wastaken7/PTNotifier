@@ -5,11 +5,30 @@ import contextlib
 import glob
 import importlib
 import pkgutil
+import subprocess
 from pathlib import Path
 from typing import Any
 
 import httpx
 from rich.console import Console
+
+
+async def check_version():
+    """Checks for new versions of the script on GitHub."""
+    try:
+        local_hash = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=True).stdout.strip()  # noqa: ASYNC221
+
+        async with httpx.AsyncClient() as client:
+            resp = await client.get("https://api.github.com/repos/wastaken7/PTNotifier/commits/main")
+            resp.raise_for_status()
+            remote_hash = resp.json()["sha"]
+
+        if local_hash != remote_hash:
+            console.print("[bold yellow]A new version is available. Please update your script.[/bold yellow]")
+
+    except Exception as e:
+        console.print(f"[bold red]Version check failed:[/] {e}")
+
 
 console = Console()
 try:
@@ -111,6 +130,7 @@ async def main():
     """
     Main execution function that initializes trackers and runs the monitoring loop.
     """
+    await check_version()
     console.print("Starting PTNotifier...")
     tracker_classes = load_trackers()
 
