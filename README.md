@@ -30,7 +30,7 @@ For these types, the name of the cookie file does not matter, as long as it is a
 ### OTHER Trackers
 These are specific trackers that have their own dedicated module. The cookie file **must be placed in the `cookies/OTHER/` directory** and **must have a specific name** that matches the tracker's module.
 
-| Module | Website URL | Required Cookie Filename | Obersvation |
+| Module | Website URL | Required Cookie Filename | Observation |
 | :--- | :--- | :--- | :--- |
 | `ANT.py` | `anthelion.me` | `ANT.txt` | |
 | `BT.py` | `brasiltracker.org` | `BT.txt` | |
