@@ -12,25 +12,8 @@ from typing import Any
 import httpx
 from rich.console import Console
 
-
-async def check_version():
-    """Checks for new versions of the script on GitHub."""
-    try:
-        local_hash = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=True).stdout.strip()  # noqa: ASYNC221
-
-        async with httpx.AsyncClient() as client:
-            resp = await client.get("https://api.github.com/repos/wastaken7/PTNotifier/commits/main")
-            resp.raise_for_status()
-            remote_hash = resp.json()["sha"]
-
-        if local_hash != remote_hash:
-            console.print("[bold yellow]A new version is available. Please update your script.[/bold yellow]")
-
-    except Exception as e:
-        console.print(f"[bold red]Version check failed:[/] {e}")
-
-
 console = Console()
+
 try:
     import config
 except ImportError:
@@ -51,6 +34,23 @@ TELEGRAM_CHAT_ID = config.SETTINGS.get("TELEGRAM_CHAT_ID")
 TELEGRAM_TOPIC_ID = config.SETTINGS.get("TELEGRAM_TOPIC_ID")
 CHECK_INTERVAL = config.SETTINGS.get("CHECK_INTERVAL", 900.0)
 MARK_AS_READ = config.SETTINGS.get("MARK_AS_READ", False)
+
+async def check_version():
+    """Checks for new versions of the script on GitHub.s"""
+    try:
+        local_hash = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=True).stdout.strip()  # noqa: ASYNC221
+
+        async with httpx.AsyncClient() as client:
+            resp = await client.get("https://api.github.com/repos/wastaken7/PTNotifier/commits/main")
+            resp.raise_for_status()
+            remote_hash = resp.json()["sha"]
+
+        if local_hash != remote_hash:
+            console.print("[bold yellow]A new update is available on main branch.[/bold yellow]")
+            console.print("[bold green]Run 'git pull' to stay up to date.\n[/bold green]")
+
+    except Exception as e:
+        console.print(f"[bold red]Version check failed:[/] {e}")
 
 
 if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:

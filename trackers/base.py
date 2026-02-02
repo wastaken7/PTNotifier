@@ -26,7 +26,9 @@ class BaseTracker(ABC):
     _request_lock = asyncio.Lock()
     _last_request_time = 0.0
 
-    def __init__(self, cookie_path: Path, tracker_name: str, base_url: str):
+    def __init__(self, cookie_path: Path, tracker_name: str, base_url: str, custom_headers: Optional[dict[str, str]] = None):
+        if custom_headers is None:
+            custom_headers = {}
         self.tracker = tracker_name
         self.cookie_path = cookie_path
         self.filename = cookie_path.name
@@ -55,6 +57,8 @@ class BaseTracker(ABC):
         self.headers = {
             "User-Agent": "PTNotifier 1.0 (https://github.com/wastaken7/PTNotifier)",
         }
+        if custom_headers:
+            self.headers.update(custom_headers)
 
         self.client = httpx.AsyncClient(
             headers=self.headers,
