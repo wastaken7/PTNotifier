@@ -13,7 +13,7 @@ console = Console()
 
 class IPTorrents(BaseTracker):
     """
-    Manages a session for IPTorrents using specific cookie files.
+    Manages a session for IPTorrents.
     """
 
     def __init__(self, cookie_path: Path):

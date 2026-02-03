@@ -17,7 +17,7 @@ console = Console()
 
 class DigitalCore(BaseTracker):
     """
-    Manages a session for DigitalCore using API endpoints and cookie files.
+    Manages a session for DigitalCore.
     """
 
     def __init__(self, cookie_path: Path):

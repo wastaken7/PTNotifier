@@ -14,7 +14,7 @@ console = Console()
 
 class HDTorrents(BaseTracker):
     """
-    Manages a session for HD-Torrents using specific cookie files.
+    Manages a session for HD-Torrents.
     """
 
     def __init__(self, cookie_path: Path):

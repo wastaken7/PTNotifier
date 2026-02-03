@@ -13,7 +13,7 @@ console = Console()
 
 class HDSpace(BaseTracker):
     """
-    Manages a session for HD-Space using specific cookie files.
+    Manages a session for HD-Space.
     """
 
     def __init__(self, cookie_path: Path):

@@ -13,7 +13,7 @@ console = Console()
 
 class Anthelion(BaseTracker):
     """
-    Manages a session for Anthelion tracker using specific cookie files.
+    Manages a session for Anthelion.
     """
 
     def __init__(self, cookie_path: Path):

@@ -13,7 +13,7 @@ console = Console()
 
 class BrasilTracker(BaseTracker):
     """
-    Manages a session for Brasil Tracker using specific cookie files.
+    Manages a session for Brasil Tracker.
     """
 
     def __init__(self, cookie_path: Path):

@@ -14,7 +14,7 @@ console = Console()
 
 class TorrentLeech(BaseTracker):
     """
-    Manages a session for TorrentLeech using specific cookie files.
+    Manages a session for TorrentLeech.
     """
 
     def __init__(self, cookie_path: Path):

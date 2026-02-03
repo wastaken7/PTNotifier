@@ -14,7 +14,7 @@ console = Console()
 
 class ImmortalSeed(BaseTracker):
     """
-    Manages a session for ImmortalSeed using specific cookie files.
+    Manages a session for ImmortalSeed.
     """
 
     def __init__(self, cookie_path: Path):

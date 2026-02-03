@@ -13,7 +13,7 @@ console = Console()
 
 class GreatPosterWall(BaseTracker):
     """
-    Manages a session for GPW tracker using specific cookie files.
+    Manages a session for GreatPosterWall.
     """
 
     def __init__(self, cookie_path: Path):

@@ -12,7 +12,7 @@ console = Console()
 
 class AvistaZ(BaseTracker):
     """
-    Manages a session for a specific cookie file (site/user).
+    Manages a session for the AvistaZ network.
     """
 
     def __init__(self, cookie_path: Path):

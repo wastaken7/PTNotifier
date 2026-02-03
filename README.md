@@ -38,7 +38,7 @@ These are specific trackers that have their own dedicated module. The cookie fil
 | `GreatPosterWall.py` | `greatposterwall.com`| `GreatPosterWall.txt` | - |
 | `HDSpace.py` | `hd-space.org`| `HDSpace.txt` | - |
 | `HDTorrents.py` | `hd-torrents.org`| `HDTorrents.txt` | ⚠️ PTN spoofs the User-Agent for it to work. |
-| `IS.py` | `immortalseed.me`| `IS.txt` | - |
+| `ImmortalSeed.py` | `immortalseed.me`| `ImmortalSeed.txt` | - |
 | `IPTorrents.py` | `iptorrents.com`| `IPTorrents.txt` | - |
 | `SceneTime.py` | `scenetime.com`| `SceneTime.txt` | - |
 | `TorrentLeech.py` | `torrentleech.org`| `TorrentLeech.txt` | - |

@@ -13,7 +13,7 @@ console = Console()
 
 class SceneTime(BaseTracker):
     """
-    Manages a session for SceneTime using specific cookie files.
+    Manages a session for SceneTime.
     """
 
     def __init__(self, cookie_path: Path):

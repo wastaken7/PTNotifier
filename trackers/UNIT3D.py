@@ -14,6 +14,9 @@ console = Console()
 
 
 class UNIT3D(BaseTracker):
+    """
+    Manages a session for UNIT3D based trackers.
+    """
     def __init__(self, cookie_path: Path):
         self.cookie_path = cookie_path
         self.domain = self._extract_domain_from_cookie(cookie_path)
