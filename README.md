@@ -36,13 +36,18 @@ These are specific trackers that have their own dedicated module. The cookie fil
 | `BrasilTracker.py` | `brasiltracker.org` | `BrasilTracker.txt` | - |
 | `DigitalCore.py` | `digitalcore.club`| `DigitalCore.txt` | - |
 | `GreatPosterWall.py` | `greatposterwall.com`| `GreatPosterWall.txt` | - |
+| `HDCiTY.py` | `hdcity.city`| `HDCiTY.txt` | - |
 | `HDSpace.py` | `hd-space.org`| `HDSpace.txt` | - |
 | `HDTorrents.py` | `hd-torrents.org`| `HDTorrents.txt` | ⚠️ PTN spoofs the User-Agent for it to work. |
 | `ImmortalSeed.py` | `immortalseed.me`| `ImmortalSeed.txt` | - |
 | `IPTorrents.py` | `iptorrents.com`| `IPTorrents.txt` | - |
+| `Lajidui.py` | `pt.lajidui.top`| `Lajidui.txt` | - |
+| `March.py` | `duckboobee.org`| `March.txt` | - |
+| `PTFans.py` | `ptfans.cc`| `PTFans.txt` | - |
+| `PTSKit.py` | `ptskit.org`| `PTSKit.txt` | - |
 | `SceneTime.py` | `scenetime.com`| `SceneTime.txt` | - |
+| `TorrentDay.py` | `torrentday.com`| `TorrentDay.txt` | - |
 | `TorrentLeech.py` | `torrentleech.org`| `TorrentLeech.txt` | - |
-
 
 ## Setup
 

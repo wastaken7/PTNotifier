@@ -1,0 +1,69 @@
+#!/usr/bin/env python3
+
+from pathlib import Path
+from typing import Any
+from urllib.parse import parse_qs, urljoin, urlparse
+
+from rich.console import Console
+
+from .base import BaseTracker
+
+console = Console()
+
+
+class PTSKit(BaseTracker):
+    def __init__(self, cookie_path: Path):
+        super().__init__(
+            cookie_path,
+            "PTSKit",
+            "https://www.ptskit.org/",
+        )
+        self.inbox_url = urljoin(self.base_url, "messages.php")
+
+    async def _fetch_items(self) -> list[dict[str, Any]]:
+        inbox_items = await self._parse_messages(self.inbox_url)
+        return inbox_items
+
+    async def _parse_messages(self, url: str) -> list[dict[str, Any]]:
+        new_items: list[dict[str, Any]] = []
+        soup = await self._fetch_page(url, "messages")
+
+        if not soup:
+            return new_items
+
+        for row in soup.find_all("tr"):
+            cells = row.find_all("td", class_="rowfollow")
+            if len(cells) < 4:
+                continue
+
+            subject_link = cells[1].find("a", href=True)
+            if not subject_link or "viewmessage" not in subject_link["href"]:
+                continue
+
+            full_link = urljoin(self.base_url, str(subject_link["href"]))
+            parsed_url = urlparse(full_link)
+            query_params = parse_qs(parsed_url.query)
+            item_id = query_params.get("id", [None])[0]
+
+            if not item_id or item_id in self.state["processed_ids"]:
+                continue
+
+            subject = subject_link.get_text(strip=True)
+            sender = cells[2].get_text(strip=True)
+
+            date_span = cells[3].find("span", title=True)
+            date_str = date_span["title"] if date_span else cells[3].get_text(strip=True)
+
+            new_items.append(
+                {
+                    "type": "message",
+                    "id": str(item_id),
+                    "title": sender,
+                    "msg": subject,
+                    "date": date_str,
+                    "url": full_link,
+                    "is_staff": False,
+                }
+            )
+
+        return new_items
