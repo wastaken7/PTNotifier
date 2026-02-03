@@ -46,6 +46,32 @@ These are specific trackers that have their own dedicated module. The cookie fil
 
 ## Setup
 
+### Telegram Bot Setup
+
+<details>
+<summary>Click to reveal instructions for creating a bot and obtaining your Chat ID</summary>
+
+#### Step 1: Create your Telegram Bot
+
+The bot acts as the delivery agent for your notifications.
+
+1. In Telegram, search for **@BotFather**.
+2. Send the command: `/newbot`
+3. Provide a display name for the bot (e.g., PT_Notifier).
+4. Create a unique username ending in "bot" (e.g., MyPrivateNotifier_bot).
+5. BotFather will provide an API TOKEN. Save this string; it is your **TELEGRAM_BOT_TOKEN**.
+
+#### Step 2: Retrieve your Chat ID
+
+You can receive notifications in a private chat or a group.
+
+1. Create a group and add your bot to it, or start a private conversation with the bot.
+2. To find the unique ID of that chat, search for and use **@userinfobot** ([https://t.me/userinfobot](https://t.me/userinfobot)).
+3. Send a message to that bot or forward a message from your group to it.
+4. The bot will return a numerical ID. Group IDs typically begin with a minus sign (e.g., -100123456789). This is your **TELEGRAM_CHAT_ID**.
+
+</details>
+
 Follow these steps to set up PTNotifier.
 
 ### 1. Prerequisites
