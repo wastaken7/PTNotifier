@@ -12,7 +12,7 @@ from .base import BaseTracker
 console = Console()
 
 
-class HDT(BaseTracker):
+class HDTorrents(BaseTracker):
     """
     Manages a session for HD-Torrents using specific cookie files.
     """

@@ -12,7 +12,7 @@ from .base import BaseTracker
 console = Console()
 
 
-class TL(BaseTracker):
+class TorrentLeech(BaseTracker):
     """
     Manages a session for TorrentLeech using specific cookie files.
     """
@@ -27,7 +27,7 @@ class TL(BaseTracker):
     async def _fetch_items(self) -> list[dict[str, Any]]:
         """Fetch notifications from TorrentLeech profile."""
         if not self.state.get("notifications_url"):
-            soup = await self._fetch_page(self.base_url, "username and profile discovery")
+            soup = await self._fetch_page(self.base_url, "user ID")
             if soup:
                 profile_link = soup.find("span", class_="link", onclick=lambda x: x and "/profile/" in x)
                 if profile_link:

@@ -12,7 +12,7 @@ from .base import BaseTracker
 console = Console()
 
 
-class IS(BaseTracker):
+class ImmortalSeed(BaseTracker):
     """
     Manages a session for ImmortalSeed using specific cookie files.
     """

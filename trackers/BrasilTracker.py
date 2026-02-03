@@ -11,27 +11,27 @@ from .base import BaseTracker
 console = Console()
 
 
-class ANT(BaseTracker):
+class BrasilTracker(BaseTracker):
     """
-    Manages a session for Anthelion tracker using specific cookie files.
+    Manages a session for Brasil Tracker using specific cookie files.
     """
 
     def __init__(self, cookie_path: Path):
-        super().__init__(cookie_path, "Anthelion", "https://anthelion.me/")
+        super().__init__(cookie_path, "BrasilTracker", "https://brasiltracker.org/")
         self.inbox_url = urljoin(self.base_url, "inbox.php")
         self.staff_url = urljoin(self.base_url, "staffpm.php")
 
     async def _fetch_items(self) -> list[dict[str, Any]]:
-        """Fetch standard and staff messages."""
+        """Fetch standard and staff messages from Brasil Tracker."""
         inbox_items = await self._parse_messages(self.inbox_url, is_staff=False)
         staff_items = await self._parse_messages(self.staff_url, is_staff=True)
         return inbox_items + staff_items
 
     async def _parse_messages(self, url: str, is_staff: bool) -> list[dict[str, Any]]:
-        """Parses all message tables for both Inbox and Staff PMs."""
+        """Parses message tables for Brasil Tracker structure."""
         new_items: list[dict[str, Any]] = []
         soup = await self._fetch_page(url, "messages")
-        if not soup:
+        if not soup or not soup.find(id="messageform"):
             return new_items
 
         tables = soup.find_all("table", class_="message_table")
@@ -39,7 +39,7 @@ class ANT(BaseTracker):
             return new_items
 
         for table in tables:
-            rows = table.find_all("tr", class_="row")
+            rows = table.find_all("tr", class_=["rowa", "rowb"])
             for row in rows:
                 cols = row.find_all("td")
                 if len(cols) < 3:
@@ -52,7 +52,6 @@ class ANT(BaseTracker):
                 subject = subject_cell.get_text(strip=True)
                 href = subject_cell.get("href", "")
                 link = urljoin(self.base_url, str(href))
-
                 item_id = link.split("id=")[-1] if "id=" in link else link
 
                 if item_id in self.state["processed_ids"]:

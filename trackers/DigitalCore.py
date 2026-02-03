@@ -15,7 +15,7 @@ from .base import BaseTracker
 console = Console()
 
 
-class DC(BaseTracker):
+class DigitalCore(BaseTracker):
     """
     Manages a session for DigitalCore using API endpoints and cookie files.
     """

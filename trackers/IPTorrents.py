@@ -11,7 +11,7 @@ from .base import BaseTracker
 console = Console()
 
 
-class IPT(BaseTracker):
+class IPTorrents(BaseTracker):
     """
     Manages a session for IPTorrents using specific cookie files.
     """

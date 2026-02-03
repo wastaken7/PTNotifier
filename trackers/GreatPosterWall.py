@@ -11,7 +11,7 @@ from .base import BaseTracker
 console = Console()
 
 
-class GPW(BaseTracker):
+class GreatPosterWall(BaseTracker):
     """
     Manages a session for GPW tracker using specific cookie files.
     """

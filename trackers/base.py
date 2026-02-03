@@ -79,7 +79,9 @@ class BaseTracker(ABC):
             except Exception:
                 return {"processed_ids": [], "last_run": 0}
         else:
-            console.print(f"{self.tracker}: [yellow]No existing state file found.[/yellow] There won't be any notifications on the first run.")
+            console.print(
+                f"{self.tracker}: [yellow]No existing state file found.[/yellow] There won't be any notifications on the first run to avoid spamming the Telegram API."
+            )
             self.first_run = True
             self.state = {"processed_ids": [], "last_run": 0}
             self._save_state()

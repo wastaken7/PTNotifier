@@ -10,7 +10,7 @@ from .base import BaseTracker
 console = Console()
 
 
-class AVISTAZ(BaseTracker):
+class AvistaZ(BaseTracker):
     """
     Manages a session for a specific cookie file (site/user).
     """

@@ -11,13 +11,13 @@ from .base import BaseTracker
 console = Console()
 
 
-class HDS(BaseTracker):
+class HDSpace(BaseTracker):
     """
     Manages a session for HD-Space using specific cookie files.
     """
 
     def __init__(self, cookie_path: Path):
-        super().__init__(cookie_path, "HD-Space", "https://hd-space.org/")
+        super().__init__(cookie_path, "HDSpace", "https://hd-space.org/")
 
     async def _fetch_items(self) -> list[dict[str, Any]]:
         """Fetch messages from HD-Space mailbox."""
