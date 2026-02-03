@@ -15,6 +15,7 @@ console = Console()
 
 class UNIT3D(BaseTracker):
     def __init__(self, cookie_path: Path):
+        self.cookie_path = cookie_path
         self.domain = self._extract_domain_from_cookie(cookie_path)
         super().__init__(cookie_path, self.domain, f"https://{self.domain}")
 
@@ -25,16 +26,26 @@ class UNIT3D(BaseTracker):
                 "Connection": "keep-alive",
             }
         )
-        self.notifications_url = self.state.get("notifications_url", "")
-        self.messages_url = self.state.get("messages_url", "")
+        if self.domain == "eiga.moi" or self.domain == "hawke.uno":
+            self.notifications_url = f"https://{self.domain}/notifications"
+            self.messages_url = f"https://{self.domain}/mail/inbox"
+        else:
+            self.notifications_url = self.state.get("notifications_url", "")
+            self.messages_url = self.state.get("messages_url", "")
         self.csrf_token: Optional[str] = self.state.get("csrf_token")
 
     async def initialize(self):
         if not self.domain:
+            console.print(f"[bold red]Initialization failed: Could not determine domain from cookies.[/bold red]: {self.cookie_path}")
             return
 
-        if self.notifications_url and self.messages_url:
-            return
+        if self.notifications_url:
+            if self.messages_url:
+                return
+            else:
+                self.state["messages_url"] = self.messages_url.replace("notifications", "conversations")
+                self._save_state()
+                return
 
         soup = await self._fetch_page(self.base_url, "user ID")
         if not soup:

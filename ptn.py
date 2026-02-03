@@ -51,6 +51,7 @@ async def check_version():
 
     except Exception as e:
         console.print(f"[bold red]Version check failed:[/] {e}")
+        console.print("Make sure git is installed and you have internet connectivity.")
 
 
 if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
@@ -64,7 +65,7 @@ async def send_telegram(item: dict[str, str], domain: str, notifications_url: st
     """
     if item["type"] == "notification":
         text = (
-            f"🔔 <b>{domain.upper()}</b>\n\n"
+            f"🔔 <b>{domain}</b>\n\n"
             f"📌 <b>{item['title']}</b>\n\n"
             f"<b>Message:</b> {item['msg']}\n\n"
             f"{item['date']}"  # fmt: skip
@@ -75,7 +76,7 @@ async def send_telegram(item: dict[str, str], domain: str, notifications_url: st
         body = f"<b>Body:</b> {item.get('body', '')}\n\n" if item.get("body") else ""
 
         text = (
-            f"📩 <b>{domain.upper()}</b>\n\n"
+            f"📩 <b>{domain}</b>\n\n"
             f"{staff_tag}"
             f"👤 <b>{item['title']}</b>\n\n"
             f"<b>Text:</b> {item['msg']}\n\n"

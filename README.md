@@ -32,14 +32,15 @@ These are specific trackers that have their own dedicated module. The cookie fil
 
 | Module | Website URL | Required Cookie Filename | Observation |
 | :--- | :--- | :--- | :--- |
-| `ANT.py` | `anthelion.me` | `ANT.txt` | |
-| `BT.py` | `brasiltracker.org` | `BT.txt` | |
-| `DC.py` | `digitalcore.club`| `DC.txt` | |
-| `GPW.py` | `greatposterwall.com`| `GPW.txt` | |
-| `HDS.py` | `hd-space.org`| `HDS.txt` | |
+| `ANT.py` | `anthelion.me` | `ANT.txt` | - |
+| `BT.py` | `brasiltracker.org` | `BT.txt` | - |
+| `DC.py` | `digitalcore.club`| `DC.txt` | - |
+| `GPW.py` | `greatposterwall.com`| `GPW.txt` | - |
+| `HDS.py` | `hd-space.org`| `HDS.txt` | - |
 | `HDT.py` | `hd-torrents.org`| `HDT.txt` | ⚠️ PTN spoofs the User-Agent for it to work. |
-| `IS.py` | `immortalseed.me`| `IS.txt` | |
-| `IPT.py` | `iptorrents.com`| `IPT.txt` | |
+| `IS.py` | `immortalseed.me`| `IS.txt` | - |
+| `IPT.py` | `iptorrents.com`| `IPT.txt` | - |
+| `TL.py` | `torrentleech.org`| `TL.txt` | - |
 
 
 ## Setup
