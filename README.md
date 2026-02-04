@@ -119,14 +119,16 @@ The first time you run the script, it will create a `config.py` file from `examp
 
 ### 5. Add Tracker Cookies
 
-This tool requires cookies to access your tracker accounts. You must export them from your browser in the **Netscape** format. A recommended browser extension for this is "Get cookies.txt LOCALLY" or a similar one.
+This tool requires cookies to access your tracker accounts. You must export them from your browser in the **Netscape** format. A recommended browser extension for this is [Get cookies.txt LOCALLY](https://chromewebstore.google.com/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc) (Chromium Browsers) or [cookies.txt](https://addons.mozilla.org/en-US/firefox/addon/cookies-txt/) (Firefox) or a similar one.
+
+**Please note that the exported cookie file is linked to your session. If you log out of the website, PTN will no longer work for that website and you will need to export it again.**
 
 1.  Log into your tracker account in your browser.
 2.  Use your chosen extension to export the cookies **for that tracker's** domain as a `.txt` file.
 3.  Save the exported cookie file into the correct subdirectory based on the tracker type, following the naming rules below.
 
 -   For **AvistaZ** or **UNIT3D** trackers, save the file in `cookies/AvistaZ/` or `cookies/UNIT3D/`. The filename can be anything (e.g., `my_cookie.txt`).
--   For trackers listed in the **Other** category, you must save the file in `cookies/Other/` and use the specific filename from the table (e.g., `GPW.txt` for GreatPosterWall).
+-   For trackers listed in the **Other** category, you must save the file in `cookies/Other/` and use the specific filename from the table above (e.g., `GreatPosterWall.txt` for GreatPosterWall).
 
 The final directory structure should look like this:
 ```
@@ -134,9 +136,9 @@ c:\PTNotifier\
 ├───cookies\
 │   ├───AvistaZ\
 │   │   └───avistaz_user.txt
-│   ├───Other\
-│   │   ├───GPW.txt
-│   │   └───ANT.txt
+│   ├───OTHER\
+│   │   ├───GreatPosterWall.txt
+│   │   └───Anthelion.txt
 │   └───UNIT3D\
 │       └───my_unit3d_site.txt
 └───...
