@@ -32,6 +32,7 @@ These are specific trackers that have their own dedicated module. The cookie fil
 
 | Module | Website URL | Required Cookie Filename | Observation |
 | :--- | :--- | :--- | :--- |
+| `AmigosShareClub.py` | `cliente.amigos-share.club`| `AmigosShareClub.txt` | - |
 | `Anthelion.py` | `anthelion.me` | `Anthelion.txt` | - |
 | `BrasilTracker.py` | `brasiltracker.org` | `BrasilTracker.txt` | - |
 | `DigitalCore.py` | `digitalcore.club`| `DigitalCore.txt` | - |
