@@ -20,15 +20,15 @@ New notifications are formatted and sent to a Telegram chat via a bot. The scrip
 
 Trackers are managed in three categories based on how their cookies are loaded.
 
-### AVISTAZ & UNIT3D Trackers
+### AvistaZ & UNIT3D Trackers
 These trackers share a common platform.
--   **AVISTAZ**: For sites in the Avistaz network (e.g., Avistaz, PrivateHD, ExoticaZ). Place cookies in the `cookies/AVISTAZ/` folder.
+-   **AvistaZ**: For sites in the AvistaZ network (e.g., AvistaZ, PrivateHD, ExoticaZ). Place cookies in the `cookies/AvistaZ/` folder.
 -   **UNIT3D**: For trackers using the UNIT3D framework. Place cookies in the `cookies/UNIT3D/` folder.
 
 For these types, the name of the cookie file does not matter, as long as it is a `.txt` file.
 
-### OTHER Trackers
-These are specific trackers that have their own dedicated module. The cookie file **must be placed in the `cookies/OTHER/` directory** and **must have a specific name** that matches the tracker's module.
+### Other Trackers
+These are specific trackers that have their own dedicated module. The cookie file **must be placed in the `cookies/Other/` directory** and **must have a specific name** that matches the tracker's module.
 
 | Module | Website URL | Required Cookie Filename | Observation |
 | :--- | :--- | :--- | :--- |
@@ -125,16 +125,16 @@ This tool requires cookies to access your tracker accounts. You must export them
 2.  Use your chosen extension to export the cookies **for that tracker's** domain as a `.txt` file.
 3.  Save the exported cookie file into the correct subdirectory based on the tracker type, following the naming rules below.
 
--   For **AVISTAZ** or **UNIT3D** trackers, save the file in `cookies/AVISTAZ/` or `cookies/UNIT3D/`. The filename can be anything (e.g., `my_cookie.txt`).
--   For trackers listed in the **OTHER** category, you must save the file in `cookies/OTHER/` and use the specific filename from the table (e.g., `GPW.txt` for GreatPosterWall).
+-   For **AvistaZ** or **UNIT3D** trackers, save the file in `cookies/AvistaZ/` or `cookies/UNIT3D/`. The filename can be anything (e.g., `my_cookie.txt`).
+-   For trackers listed in the **Other** category, you must save the file in `cookies/Other/` and use the specific filename from the table (e.g., `GPW.txt` for GreatPosterWall).
 
 The final directory structure should look like this:
 ```
 c:\PTNotifier\
 ├───cookies\
-│   ├───AVISTAZ\
+│   ├───AvistaZ\
 │   │   └───avistaz_user.txt
-│   ├───OTHER\
+│   ├───Other\
 │   │   ├───GPW.txt
 │   │   └───ANT.txt
 │   └───UNIT3D\

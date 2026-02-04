@@ -146,8 +146,8 @@ async def main():
                 tracker_instance = tracker_class(Path(f))
                 tasks.append(tracker_instance.fetch_notifications(send_telegram))
 
-        # Handle OTHER directory
-        other_cookie_files = glob.glob(str(COOKIES_DIR / "OTHER" / "*.txt"))
+        # Handle Other directory
+        other_cookie_files = glob.glob(str(COOKIES_DIR / "Other" / "*.txt"))
         for f in other_cookie_files:
             cookie_path = Path(f)
             tracker_name_from_file = cookie_path.stem
