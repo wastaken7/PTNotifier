@@ -125,7 +125,7 @@ This tool requires cookies to access your tracker accounts. You must export them
 
 1.  Log into your tracker account in your browser.
 2.  Use your chosen extension to export the cookies **for that tracker's** domain as a `.txt` file.
-3.  Save the exported cookie file into the correct subdirectory based on the tracker type, following the naming rules below.
+3.  Save the exported cookie file into the correct subdirectory based on the tracker type, following the naming rules in the table above.
 
 -   For **AvistaZ** or **UNIT3D** trackers, save the file in `cookies/AvistaZ/` or `cookies/UNIT3D/`. The filename can be anything (e.g., `my_cookie.txt`).
 -   For trackers listed in the **Other** category, you must save the file in `cookies/Other/` and use the specific filename from the table above (e.g., `GreatPosterWall.txt` for GreatPosterWall).
@@ -136,7 +136,7 @@ c:\PTNotifier\
 ├───cookies\
 │   ├───AvistaZ\
 │   │   └───avistaz_user.txt
-│   ├───OTHER\
+│   ├───Other\
 │   │   ├───GreatPosterWall.txt
 │   │   └───Anthelion.txt
 │   └───UNIT3D\
