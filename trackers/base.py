@@ -104,17 +104,17 @@ class BaseTracker(ABC):
                 self.state["processed_ids"] = self.state["processed_ids"][-300:]
             self._save_state()
 
-    async def fetch_notifications(self, send_telegram: Callable[[dict[str, Any], str, str], Coroutine[Any, Any, None]]):
+    async def fetch_notifications(self, notifiers: list[Callable[[dict[str, Any], str, str], Coroutine[Any, Any, None]]]):
         if self.should_run:
             self.state["last_run"] = time.time()
             self._save_state()
-            await self.process(send_telegram)
+            await self.process(notifiers)
         else:
             console.print(f"{self.tracker}: Skipping check, last run was too recent.")
 
     async def process(
         self,
-        send_telegram: Callable[[dict[str, Any], str, str], Coroutine[Any, Any, None]],
+        notifiers: list[Callable[[dict[str, Any], str, str], Coroutine[Any, Any, None]]],
     ) -> None:
         """Main loop to fetch and process notifications."""
         try:
@@ -122,8 +122,9 @@ class BaseTracker(ABC):
 
             for item in all_items:
                 if not self.first_run:
-                    await send_telegram(item, self.tracker, item["url"])
-                    await asyncio.sleep(3)
+                    for notifier in notifiers:
+                        await notifier(item, self.tracker, item["url"])
+                        await asyncio.sleep(3)
                 await self._ack_item(item)
 
         except Exception as e:

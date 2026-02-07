@@ -13,6 +13,9 @@ from typing import Any
 import httpx
 from rich.console import Console
 
+from apps.discord import send_discord
+from apps.telegram import send_telegram
+
 console = Console()
 
 try:
@@ -29,12 +32,12 @@ COOKIES_DIR = Path("./cookies")
 STATE_DIR = Path("./state")
 STATE_DIR.mkdir(exist_ok=True)
 COOKIES_DIR.mkdir(exist_ok=True)
-
 TELEGRAM_BOT_TOKEN = config.SETTINGS.get("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = config.SETTINGS.get("TELEGRAM_CHAT_ID")
-TELEGRAM_TOPIC_ID = config.SETTINGS.get("TELEGRAM_TOPIC_ID")
+DISCORD_WEBHOOK_URL = config.SETTINGS.get("DISCORD_WEBHOOK_URL")
 CHECK_INTERVAL = config.SETTINGS.get("CHECK_INTERVAL", 900.0)
 MARK_AS_READ = config.SETTINGS.get("MARK_AS_READ", False)
+
 
 async def check_version():
     """Checks for new versions of the script on GitHub.s"""
@@ -55,52 +58,9 @@ async def check_version():
         console.print("Make sure git is installed and you have internet connectivity.")
 
 
-if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
-    console.print("Error: [bold red]TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID must be set in config.py[/bold red]")
+if (not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID) and not DISCORD_WEBHOOK_URL:
+    console.print("Error: [bold red]Please set TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID or DISCORD_WEBHOOK_URL in config.py[/bold red]")
     exit(1)
-
-
-async def send_telegram(item: dict[str, str], domain: str, notifications_url: str):
-    """
-    Sends a formatted notification to Telegram.
-    """
-    if item["type"] == "notification":
-        text = (
-            f"🔔 <b>{domain}</b>\n\n"
-            f"📌 <b>{item['title']}</b>\n\n"
-            f"<b>Message:</b> {item['msg']}\n\n"
-            f"{item['date']}"  # fmt: skip
-        )
-
-    elif item["type"] == "message":
-        staff_tag = "⚠ <b>STAFF MESSAGE</b> ⚠\n\n" if item.get("is_staff") else ""
-        body = f"<b>Body:</b> {item.get('body', '')}\n\n" if item.get("body") else ""
-
-        text = (
-            f"📩 <b>{domain}</b>\n\n"
-            f"{staff_tag}"
-            f"👤 <b>{item['title']}</b>\n\n"
-            f"<b>Text:</b> {item['msg']}\n\n"
-            f"{body}"
-            f"{item['date']}"  # fmt: skip
-        )
-
-    keyboard = {"inline_keyboard": [[{"text": "Open Notification", "url": notifications_url}]]}
-
-    payload = {"chat_id": TELEGRAM_CHAT_ID, "text": text, "parse_mode": "HTML", "reply_markup": keyboard}
-
-    if TELEGRAM_TOPIC_ID:
-        payload["message_thread_id"] = TELEGRAM_TOPIC_ID
-
-    async with httpx.AsyncClient() as tg_client:
-        try:
-            url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-            resp = await tg_client.post(url, json=payload)
-            resp.raise_for_status()
-            if not resp.is_success:
-                console.print(f"[bold red]Telegram Error[/bold red]: {resp.text}")
-        except Exception as e:
-            console.print(f"[bold red]Telegram Exception[/bold red]: {e}")
 
 
 def load_trackers() -> dict[str, Any]:
@@ -136,6 +96,12 @@ async def main():
     console.print("Starting PTNotifier...")
     tracker_classes = load_trackers()
 
+    notifiers = []
+    if TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID:
+        notifiers.append(send_telegram)
+    if DISCORD_WEBHOOK_URL:
+        notifiers.append(send_discord)
+
     while True:
         tasks = []
         for tracker_name, tracker_class in tracker_classes.items():
@@ -145,7 +111,7 @@ async def main():
 
             for f in cookie_files:
                 tracker_instance = tracker_class(Path(f))
-                tasks.append(tracker_instance.fetch_notifications(send_telegram))
+                tasks.append(tracker_instance.fetch_notifications(notifiers))
 
         # Handle Other directory
         other_cookie_files = glob.glob(str(COOKIES_DIR / "Other" / "*.txt"))
@@ -155,7 +121,7 @@ async def main():
             tracker_class = tracker_classes.get(tracker_name_from_file)
             if tracker_class:
                 tracker_instance = tracker_class(cookie_path)
-                tasks.append(tracker_instance.fetch_notifications(send_telegram))
+                tasks.append(tracker_instance.fetch_notifications(notifiers))
             else:
                 console.print(f"[bold red]No tracker class found for cookie file: {cookie_path.name}[/bold red]")
 

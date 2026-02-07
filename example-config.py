@@ -1,6 +1,7 @@
 SETTINGS = {
     "TELEGRAM_BOT_TOKEN": "",
     "TELEGRAM_CHAT_ID": "",
+    "DISCORD_WEBHOOK_URL": "",
     # Seconds between checks
     # Make sure not to overload trackers
     # It might get you banned!
