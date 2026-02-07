@@ -4,6 +4,7 @@ import asyncio
 import contextlib
 import glob
 import importlib
+import os
 import pkgutil
 import subprocess
 from pathlib import Path
@@ -179,6 +180,13 @@ async def main():
         except Exception as e:
             console.print(f"[bold red]An unexpected error occurred during sleep:[/bold red] {e}")
             await asyncio.sleep(60)
+
+        # Clear the user console after each check cycle
+        clear_terminal()
+
+
+def clear_terminal():
+    os.system("cls" if os.name == "nt" else "clear")
 
 
 if __name__ == "__main__":

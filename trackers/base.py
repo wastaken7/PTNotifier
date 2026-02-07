@@ -5,6 +5,7 @@ import json
 import time
 from abc import ABC, abstractmethod
 from collections.abc import Coroutine
+from datetime import datetime, timezone
 from http.cookiejar import MozillaCookieJar
 from pathlib import Path
 from typing import Any, Callable, Optional
@@ -169,7 +170,7 @@ class BaseTracker(ABC):
             BaseTracker._last_request_time = time.monotonic()
 
             try:
-                console.print(f"{self.tracker}: [blue]Checking for {request_type}...[/blue]")
+                console.print(f"[{datetime.now(timezone.utc).strftime('%H:%M:%S')}] {self.tracker}: [blue]Checking for {request_type}...[/blue]")
                 response = await self.client.get(url, timeout=timeout)
                 response.raise_for_status()
                 return BeautifulSoup(response.text, "html.parser")
