@@ -7,8 +7,9 @@ import importlib
 import os
 import pkgutil
 import subprocess
+from collections.abc import Coroutine
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 import httpx
 from rich.console import Console
@@ -19,7 +20,7 @@ from apps.telegram import send_telegram
 console = Console()
 
 try:
-    import config
+    import config as _imported_config
 except ImportError:
     console.print("[yellow]config.py not found. Creating from example-config.py...[/yellow]")
     console.print("[yellow]Please edit config.py with your settings before running again.[/yellow]")
@@ -28,15 +29,17 @@ except ImportError:
     shutil.copyfile("example-config.py", "config.py")
     exit(1)
 
+user_config: dict[str, Any] = _imported_config.SETTINGS
+
 COOKIES_DIR = Path("./cookies")
 STATE_DIR = Path("./state")
 STATE_DIR.mkdir(exist_ok=True)
 COOKIES_DIR.mkdir(exist_ok=True)
-TELEGRAM_BOT_TOKEN = config.SETTINGS.get("TELEGRAM_BOT_TOKEN")
-TELEGRAM_CHAT_ID = config.SETTINGS.get("TELEGRAM_CHAT_ID")
-DISCORD_WEBHOOK_URL = config.SETTINGS.get("DISCORD_WEBHOOK_URL")
-CHECK_INTERVAL = config.SETTINGS.get("CHECK_INTERVAL", 900.0)
-MARK_AS_READ = config.SETTINGS.get("MARK_AS_READ", False)
+TELEGRAM_BOT_TOKEN = user_config.get("TELEGRAM_BOT_TOKEN")
+TELEGRAM_CHAT_ID = user_config.get("TELEGRAM_CHAT_ID")
+DISCORD_WEBHOOK_URL = user_config.get("DISCORD_WEBHOOK_URL")
+CHECK_INTERVAL = user_config.get("CHECK_INTERVAL", 900.0)
+MARK_AS_READ = user_config.get("MARK_AS_READ", False)
 
 
 async def check_version():
@@ -96,14 +99,14 @@ async def main():
     console.print("Starting PTNotifier...")
     tracker_classes = load_trackers()
 
-    notifiers = []
+    notifiers: list[Callable[[dict[str, Any], str, str, str], Coroutine[Any, Any, None]]] = []
     if TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID:
         notifiers.append(send_telegram)
     if DISCORD_WEBHOOK_URL:
         notifiers.append(send_discord)
 
     while True:
-        tasks = []
+        tasks: list[Any] = []
         for tracker_name, tracker_class in tracker_classes.items():
             cookie_files = glob.glob(str(COOKIES_DIR / tracker_name.upper() / "*.txt"))
             if not cookie_files:

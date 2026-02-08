@@ -22,6 +22,18 @@ class AvistaZ(BaseTracker):
         self.notifications_url = self.base_url + "notifications"
         self.messages_url = self.base_url + "messenger"
 
+    def get_favicon(self) -> str:
+        if "privatehd" in self.domain:
+            return "https://privatehd.to/images/privatehd-favicon.png"
+        elif "cinemaz" in self.domain:
+            return "https://cinemaz.to/images/cinemaz-favicon.png"
+        elif "avistaz" in self.domain:
+            return "https://avistaz.to/images/avistaz-favicon.png"
+        elif "exoticaz" in self.domain:
+            return "https://i.exoticaz.to/images/favicon.png"
+        else:
+            return "https://avistaz.to/images/avistaz-favicon.png"
+
     async def _fetch_items(self) -> list[dict[str, Any]]:
         """Fetch all new items from the tracker."""
         notifications = await self._fetch_and_parse_notifications()
@@ -59,10 +71,11 @@ class AvistaZ(BaseTracker):
 
             new_items.append(
                 {
+                    "favicon": self.get_favicon(),
                     "type": "notification",
                     "id": link,
                     "title": title,
-                    "msg": notification_msg,
+                    "subject": notification_msg,
                     "date": date_posted,
                     "url": link,
                 }
@@ -105,8 +118,8 @@ class AvistaZ(BaseTracker):
                 {
                     "type": "message",
                     "id": link,
-                    "title": f"PM from {sender}",
-                    "msg": f"Subject: {subject}",
+                    "sender": sender,
+                    "subject": subject,
                     "date": age,
                     "url": link,
                 }

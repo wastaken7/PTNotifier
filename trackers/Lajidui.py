@@ -18,8 +18,8 @@ class Lajidui(BaseTracker):
     def __init__(self, cookie_path: Path):
         super().__init__(
             cookie_path,
-            "Lajidui",
-            "https://pt.lajidui.top/",
+            tracker_name="Lajidui",
+            base_url="https://pt.lajidui.top/",
         )
         self.inbox_url = urljoin(self.base_url, "messages.php")
 
@@ -38,7 +38,7 @@ class Lajidui(BaseTracker):
 
         target_table = None
         for table in tables:
-            if table.find("td", text=lambda x: x and "Subject" in x):
+            if table.find("td", text=lambda x: bool(x and "Subject" in x)):
                 target_table = table
                 break
 
@@ -56,7 +56,7 @@ class Lajidui(BaseTracker):
             if len(cells) < 4:
                 continue
 
-            link_tag = cells[1].find("a", href=lambda x: x and "action=viewmessage" in x)
+            link_tag = cells[1].find("a", href=lambda x: bool(x and "action=viewmessage" in x))
             if not link_tag:
                 continue
 
@@ -72,14 +72,16 @@ class Lajidui(BaseTracker):
             date_span = cells[3].find("span", title=True)
             date_str = date_span["title"] if date_span else cells[3].get_text(strip=True)
 
-            new_items.append({
-                "type": "message",
-                "id": item_id,
-                "title": sender,
-                "msg": subject,
-                "date": date_str,
-                "url": msg_url,
-                "is_staff": False,
-            })
+            new_items.append(
+                {
+                    "type": "message",
+                    "id": item_id,
+                    "title": sender,
+                    "subject": subject,
+                    "date": date_str,
+                    "url": msg_url,
+                    "is_staff": False,
+                }
+            )
 
         return new_items

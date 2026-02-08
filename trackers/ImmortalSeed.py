@@ -18,7 +18,11 @@ class ImmortalSeed(BaseTracker):
     """
 
     def __init__(self, cookie_path: Path):
-        super().__init__(cookie_path, "ImmortalSeed", "https://immortalseed.me/")
+        super().__init__(
+            cookie_path,
+            tracker_name="ImmortalSeed",
+            base_url="https://immortalseed.me/",
+        )
         self.inbox_url = urljoin(self.base_url, "messages.php")
 
     async def _fetch_items(self) -> list[dict[str, Any]]:
@@ -76,7 +80,7 @@ class ImmortalSeed(BaseTracker):
                     "type": "message",
                     "id": item_id,
                     "title": sender,
-                    "msg": subject,
+                    "subject": subject,
                     "date": date_str,
                     "url": link,
                     "is_staff": False,

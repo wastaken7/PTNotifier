@@ -17,7 +17,11 @@ class Anthelion(BaseTracker):
     """
 
     def __init__(self, cookie_path: Path):
-        super().__init__(cookie_path, "Anthelion", "https://anthelion.me/")
+        super().__init__(
+            cookie_path,
+            tracker_name="Anthelion",
+            base_url="https://anthelion.me/",
+        )
         self.inbox_url = urljoin(self.base_url, "inbox.php")
         self.staff_url = urljoin(self.base_url, "staffpm.php")
 
@@ -30,7 +34,8 @@ class Anthelion(BaseTracker):
     async def _parse_messages(self, url: str, is_staff: bool) -> list[dict[str, Any]]:
         """Parses all message tables for both Inbox and Staff PMs."""
         new_items: list[dict[str, Any]] = []
-        soup = await self._fetch_page(url, "messages")
+        message_type = "messages" if not is_staff else "staff messages"
+        soup = await self._fetch_page(url, message_type)
         if not soup:
             return new_items
 
@@ -69,8 +74,8 @@ class Anthelion(BaseTracker):
                     {
                         "type": "message",
                         "id": item_id,
-                        "title": sender,
-                        "msg": subject,
+                        "sender": sender,
+                        "subject": subject,
                         "date": date_str,
                         "url": link,
                         "is_staff": is_staff,

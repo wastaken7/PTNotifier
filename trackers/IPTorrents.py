@@ -17,7 +17,11 @@ class IPTorrents(BaseTracker):
     """
 
     def __init__(self, cookie_path: Path):
-        super().__init__(cookie_path, "IPTorrents", "https://iptorrents.com/")
+        super().__init__(
+            cookie_path,
+            tracker_name="IPTorrents",
+            base_url="https://iptorrents.com/",
+        )
         self.inbox_url = urljoin(self.base_url, "inbox")
 
     async def _fetch_items(self) -> list[dict[str, Any]]:
@@ -67,7 +71,7 @@ class IPTorrents(BaseTracker):
                     "type": "message",
                     "id": item_id,
                     "title": sender,
-                    "msg": subject,
+                    "subject": subject,
                     "date": date_str,
                     "url": link,
                     "is_staff": is_staff,

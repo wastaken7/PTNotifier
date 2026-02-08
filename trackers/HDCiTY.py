@@ -19,8 +19,8 @@ class HDCiTY(BaseTracker):
     def __init__(self, cookie_path: Path):
         super().__init__(
             cookie_path,
-            "HDCiTY",
-            "https://hdcity.city/",
+            tracker_name="HDCiTY",
+            base_url="https://hdcity.city/",
         )
         self.inbox_url = urljoin(self.base_url, "messages")
 
@@ -66,7 +66,7 @@ class HDCiTY(BaseTracker):
                     "type": "message",
                     "id": item_id,
                     "title": sender,
-                    "msg": subject,
+                    "subject": subject,
                     "date": date_str,
                     "url": link,
                     "is_staff": False,

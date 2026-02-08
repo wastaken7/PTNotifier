@@ -17,14 +17,18 @@ class HDSpace(BaseTracker):
     """
 
     def __init__(self, cookie_path: Path):
-        super().__init__(cookie_path, "HDSpace", "https://hd-space.org/")
+        super().__init__(
+            cookie_path,
+            tracker_name="HDSpace",
+            base_url="https://hd-space.org/",
+        )
 
     async def _fetch_items(self) -> list[dict[str, Any]]:
         """Fetch messages from HD-Space mailbox."""
         if not self.state.get("notifications_url"):
-            soup = await self._fetch_page(self.base_url, "notifications")
+            soup = await self._fetch_page(self.base_url, "user ID")
             if soup:
-                user_cp_link = soup.find("a", href=lambda h: h and "page=usercp&uid=" in h)
+                user_cp_link = soup.find("a", href=lambda h: bool(h and "page=usercp&uid=" in h))
                 if user_cp_link:
                     href = str(user_cp_link.get("href", ""))
                     uid = href.split("uid=")[-1].split("&")[0]
@@ -80,7 +84,7 @@ class HDSpace(BaseTracker):
                     "type": "message",
                     "id": item_id,
                     "title": sender,
-                    "msg": subject,
+                    "subject": subject,
                     "date": date_str,
                     "url": link,
                     "is_staff": False,

@@ -5,7 +5,6 @@ import json
 import time
 from abc import ABC, abstractmethod
 from collections.abc import Coroutine
-from datetime import datetime, timezone
 from http.cookiejar import MozillaCookieJar
 from pathlib import Path
 from typing import Any, Callable, Optional
@@ -27,7 +26,13 @@ class BaseTracker(ABC):
     _request_lock = asyncio.Lock()
     _last_request_time = 0.0
 
-    def __init__(self, cookie_path: Path, tracker_name: str, base_url: str, custom_headers: Optional[dict[str, str]] = None):
+    def __init__(
+        self,
+        cookie_path: Path,
+        tracker_name: str,
+        base_url: str,
+        custom_headers: Optional[dict[str, str]] = None,
+    ):
         if custom_headers is None:
             custom_headers = {}
         self.tracker = tracker_name
@@ -104,7 +109,7 @@ class BaseTracker(ABC):
                 self.state["processed_ids"] = self.state["processed_ids"][-300:]
             self._save_state()
 
-    async def fetch_notifications(self, notifiers: list[Callable[[dict[str, Any], str, str], Coroutine[Any, Any, None]]]):
+    async def fetch_notifications(self, notifiers: list[Callable[[dict[str, Any], str, str, str], Coroutine[Any, Any, None]]]):
         if self.should_run:
             self.state["last_run"] = time.time()
             self._save_state()
@@ -114,16 +119,21 @@ class BaseTracker(ABC):
 
     async def process(
         self,
-        notifiers: list[Callable[[dict[str, Any], str, str], Coroutine[Any, Any, None]]],
+        notifiers: list[Callable[[dict[str, Any], str, str, str], Coroutine[Any, Any, None]]],
     ) -> None:
         """Main loop to fetch and process notifications."""
         try:
-            all_items = await self._fetch_items()
+            all_items: list[dict[str, Any]] = await self._fetch_items()
 
             for item in all_items:
                 if not self.first_run:
                     for notifier in notifiers:
-                        await notifier(item, self.tracker, item["url"])
+                        await notifier(
+                            item,
+                            self.tracker,
+                            self.base_url,
+                            item["url"],
+                        )
                         await asyncio.sleep(3)
                 await self._ack_item(item)
 
@@ -171,7 +181,7 @@ class BaseTracker(ABC):
             BaseTracker._last_request_time = time.monotonic()
 
             try:
-                console.print(f"[{datetime.now(timezone.utc).strftime('%H:%M:%S')}] {self.tracker}: [blue]Checking for {request_type}...[/blue]")
+                console.print(f"{self.tracker}: [blue]Checking for {request_type}...[/blue]")
                 response = await self.client.get(url, timeout=timeout)
                 response.raise_for_status()
                 return BeautifulSoup(response.text, "html.parser")

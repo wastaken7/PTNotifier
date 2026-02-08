@@ -20,11 +20,9 @@ class HDTorrents(BaseTracker):
     def __init__(self, cookie_path: Path):
         super().__init__(
             cookie_path,
-            "HD-Torrents",
-            "https://hd-torrents.org/",
-            custom_headers={
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-            }
+            tracker_name="HD-Torrents",
+            base_url="https://hd-torrents.org/",
+            custom_headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"},
         )
 
     async def _fetch_items(self) -> list[dict[str, Any]]:
@@ -32,7 +30,7 @@ class HDTorrents(BaseTracker):
         if not self.state.get("notifications_url"):
             soup = await self._fetch_page(self.base_url, "user ID")
             if soup:
-                user_cp_link = soup.find("a", href=lambda h: h and "usercp.php?uid=" in h)
+                user_cp_link = soup.find("a", href=lambda h: bool(h and "usercp.php?uid=" in h))
                 if user_cp_link:
                     href = str(user_cp_link.get("href", ""))
                     match = re.search(r'uid=(\d+)', href)
@@ -90,7 +88,7 @@ class HDTorrents(BaseTracker):
                     "type": "message",
                     "id": item_id,
                     "title": sender,
-                    "msg": subject,
+                    "subject": subject,
                     "date": date_str,
                     "url": link,
                     "is_staff": False,

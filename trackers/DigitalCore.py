@@ -21,7 +21,11 @@ class DigitalCore(BaseTracker):
     """
 
     def __init__(self, cookie_path: Path):
-        super().__init__(cookie_path, "DigitalCore", "https://digitalcore.club/")
+        super().__init__(
+            cookie_path,
+            tracker_name="DigitalCore",
+            base_url="https://digitalcore.club/",
+        )
         self.headers.update({"Accept": "application/json, text/plain, */*"})
 
         self.mailbox_api = urljoin(self.base_url, "/api/v1/mailbox?index=0&limit=20&location=0")
@@ -35,6 +39,7 @@ class DigitalCore(BaseTracker):
         except (ValueError, TypeError):
             config_timeout = 30
         try:
+            console.print(f"{self.tracker}: [blue]Checking for {'messages' if 'mailbox' in url else 'notifications'}...[/blue]")
             response = await self.client.get(url, timeout=config_timeout)
             response.raise_for_status()
             return response.json()
@@ -63,14 +68,15 @@ class DigitalCore(BaseTracker):
             sender = msg.get("user", {}).get("username", "System")
             subject = msg.get("subject", "No Subject")
             link = urljoin(self.base_url, f"/mailbox/{item_id}")
+            clean_body = re.sub(r"\[.*?\]", "", msg.get("body", "")).strip()
 
             new_items.append(
                 {
                     "type": "message",
                     "id": item_id,
-                    "title": sender,
-                    "msg": subject,
-                    "body": msg.get("body", ""),
+                    "sender": sender,
+                    "subject": subject,
+                    "body": clean_body,
                     "date": msg.get("added", ""),
                     "url": link,
                 }
@@ -78,7 +84,7 @@ class DigitalCore(BaseTracker):
         return new_items
 
     async def _fetch_notifications(self) -> list[dict[str, Any]]:
-        """Parses the notifications API response (tips, thanks, etc)."""
+        """Parses the notifications API response."""
         new_items: list[dict[str, Any]] = []
         data = await self._fetch_api(self.notifications_api)
         if not data:
@@ -99,8 +105,7 @@ class DigitalCore(BaseTracker):
                 {
                     "type": "notification",
                     "id": item_id,
-                    "title": "Notification",
-                    "msg": clean_msg,
+                    "subject": clean_msg,
                     "date": date_str,
                     "url": urljoin(self.base_url, "/notifications"),
                 }

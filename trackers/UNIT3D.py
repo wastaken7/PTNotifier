@@ -20,7 +20,11 @@ class UNIT3D(BaseTracker):
     def __init__(self, cookie_path: Path):
         self.cookie_path = cookie_path
         self.domain = self._extract_domain_from_cookie(cookie_path)
-        super().__init__(cookie_path, self.domain, f"https://{self.domain}")
+        super().__init__(
+            cookie_path,
+            tracker_name=self.domain,
+            base_url=f"https://{self.domain}",
+        )
 
         self.headers.update(
             {
@@ -57,15 +61,21 @@ class UNIT3D(BaseTracker):
 
         token_tag = soup.find("meta", {"name": "csrf-token"})
         if token_tag:
-            self.csrf_token = token_tag.get("content")
+            content = token_tag.get("content")
+            if isinstance(content, list):
+                self.csrf_token = content[0] if content else None
+            else:
+                self.csrf_token = content
 
-        notif_link = soup.find("a", href=lambda href: href and "notifications" in href)
+        notif_link = soup.find("a", href=lambda href: bool(href and "notifications" in href))
         if notif_link:
-            self.notifications_url = self._make_absolute_url(notif_link["href"])
+            href = notif_link.get("href")
+            self.notifications_url = self._make_absolute_url(href[0] if isinstance(href, list) else str(href))
 
-        msg_link = soup.find("a", href=lambda href: href and "conversations" in href)
+        msg_link = soup.find("a", href=lambda href: bool(href and "conversations" in href))
         if msg_link:
-            self.messages_url = self._make_absolute_url(msg_link["href"])
+            href = msg_link.get("href")
+            self.messages_url = self._make_absolute_url(href[0] if isinstance(href, list) else str(href))
 
         if self.notifications_url or self.messages_url or self.csrf_token:
             self.state["notifications_url"] = self.notifications_url
@@ -78,7 +88,12 @@ class UNIT3D(BaseTracker):
             return href
         return f"{self.base_url.rstrip('/')}/{href.lstrip('/')}"
 
-    async def _fetch_and_parse(self, url: str, parse_func: Callable, request_type: str):
+    async def _fetch_and_parse(
+        self,
+        url: str,
+        parse_func: Callable[[BeautifulSoup], list[dict[str, Any]]],
+        request_type: str,
+    ) -> list[dict[str, Any]]:
         if not url:
             return []
         soup = await self._fetch_page(url, request_type)
@@ -88,7 +103,7 @@ class UNIT3D(BaseTracker):
 
     def _parse_notifications_html(self, soup: BeautifulSoup) -> list[dict[str, Any]]:
         unread_cells = soup.find_all("td", class_="notification--unread")
-        items = []
+        items: list[dict[str, Any]] = []
 
         for cell in unread_cells:
             row = cell.find_parent("tr")
@@ -107,13 +122,12 @@ class UNIT3D(BaseTracker):
             notif_id = f"notif_{action_url_str.rstrip('/').split('/')[-1]}"
             if notif_id in self.state["processed_ids"]:
                 continue
-
             items.append(
                 {
                     "type": "notification",
                     "id": notif_id,
                     "title": cols[0].get_text(" ", strip=True),
-                    "msg": cols[1].get_text(" ", strip=True),
+                    "subject": cols[1].get_text(" ", strip=True),
                     "date": cols[2].get_text(" ", strip=True),
                     "url": action_url_str,
                 }
@@ -121,7 +135,7 @@ class UNIT3D(BaseTracker):
         return items
 
     def _parse_messages_html(self, soup: BeautifulSoup) -> list[dict[str, Any]]:
-        items = []
+        items: list[dict[str, Any]] = []
         rows = soup.find_all("tr")
 
         for row in rows:
@@ -151,15 +165,15 @@ class UNIT3D(BaseTracker):
                 {
                     "type": "message",
                     "id": msg_id,
-                    "title": sender,
-                    "msg": subject,
+                    "sender": sender,
+                    "subject": subject,
                     "date": cols[2].get_text(strip=True),
                     "url": str(msg_url),
                 }
             )
         return items
 
-    async def _mark_as_read(self, item: dict) -> bool:
+    async def _mark_as_read(self, item: dict[str, Any]) -> bool:
         if item["type"] == "message":
             return True
 
@@ -167,7 +181,7 @@ class UNIT3D(BaseTracker):
             return True
 
         payload = {"_token": self.csrf_token, "_method": "PATCH"}
-        headers = {
+        headers: dict[str, str] = {
             **self.headers,
             "Content-Type": "application/x-www-form-urlencoded",
             "Referer": self.notifications_url,

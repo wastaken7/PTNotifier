@@ -17,7 +17,11 @@ class GreatPosterWall(BaseTracker):
     """
 
     def __init__(self, cookie_path: Path):
-        super().__init__(cookie_path, "GreatPosterWall", "https://greatposterwall.com/")
+        super().__init__(
+            cookie_path,
+            tracker_name="GreatPosterWall",
+            base_url="https://greatposterwall.com/",
+        )
         self.inbox_url = urljoin(self.base_url, "inbox.php")
         self.staff_url = urljoin(self.base_url, "staffpm.php")
 
@@ -30,11 +34,12 @@ class GreatPosterWall(BaseTracker):
     async def _parse_messages(self, url: str, is_staff: bool) -> list[dict[str, Any]]:
         """Parses all message tables for both Inbox and Staff PMs."""
         new_items: list[dict[str, Any]] = []
-        soup = await self._fetch_page(url, "messages")
+        message_type = "messages" if not is_staff else "staff messages"
+        soup = await self._fetch_page(url, message_type)
         if not soup:
             return new_items
 
-        tables = soup.find_all("table", class_=lambda x: x and ("TableUserInbox" in x or "Table" in x))
+        tables = soup.find_all("table", class_=lambda x: bool(x and ("TableUserInbox" in x or "Table" in x)))
         if not tables:
             return new_items
 
@@ -69,7 +74,7 @@ class GreatPosterWall(BaseTracker):
                         "type": "message",
                         "id": item_id,
                         "title": sender,
-                        "msg": subject,
+                        "subject": subject,
                         "date": date_str,
                         "url": link,
                         "is_staff": is_staff,

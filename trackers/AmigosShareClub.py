@@ -19,14 +19,14 @@ class AmigosShareClub(BaseTracker):
     def __init__(self, cookie_path: Path):
         super().__init__(
             cookie_path,
-            "AmigosShareClub",
-            "https://cliente.amigos-share.club/",
+            tracker_name="AmigosShareClub",
+            base_url="https://cliente.amigos-share.club/",
         )
         self.inbox_url = "https://cliente.amigos-share.club/mensagens.php?do=entrada"
 
     async def _fetch_items(self) -> list[dict[str, Any]]:
         """Fetch messages from ASC inbox."""
-        inbox_items = await self._parse_messages(self.inbox_url)
+        inbox_items: list[dict[str, Any]] = await self._parse_messages(self.inbox_url)
         return inbox_items
 
     async def _parse_messages(self, url: str) -> list[dict[str, Any]]:
@@ -78,8 +78,8 @@ class AmigosShareClub(BaseTracker):
                 {
                     "type": "message",
                     "id": item_id,
-                    "title": sender,
-                    "msg": subject,
+                    "sender": sender,
+                    "subject": subject,
                     "date": date_str,
                     "url": link,
                     "is_staff": False,

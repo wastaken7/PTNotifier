@@ -1,4 +1,6 @@
-SETTINGS = {
+from typing import Any
+
+SETTINGS: dict[str, Any] = {
     "TELEGRAM_BOT_TOKEN": "",
     "TELEGRAM_CHAT_ID": "",
     "DISCORD_WEBHOOK_URL": "",
