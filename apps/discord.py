@@ -21,7 +21,7 @@ async def get_local_favicon(client: httpx.AsyncClient, icon_url: str, tracker_na
     await icons_dir.mkdir(parents=True, exist_ok=True)
 
     safe_name = "".join(c for c in tracker_name if c.isalnum() or c in (" ", "_", "-")).strip()
-    icon_filename = f"{safe_name}_icon.png"
+    icon_filename = f"{safe_name}.png"
     icon_path = icons_dir / icon_filename
 
     if await icon_path.exists():
