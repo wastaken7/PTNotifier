@@ -26,7 +26,13 @@ class BaseTracker(ABC):
     _request_lock = asyncio.Lock()
     _last_request_time = 0.0
 
-    def __init__(self, cookie_path: Path, tracker_name: str, base_url: str, custom_headers: Optional[dict[str, str]] = None):
+    def __init__(
+        self,
+        cookie_path: Path,
+        tracker_name: str,
+        base_url: str,
+        custom_headers: Optional[dict[str, str]] = None,
+    ):
         if custom_headers is None:
             custom_headers = {}
         self.tracker = tracker_name
@@ -103,26 +109,32 @@ class BaseTracker(ABC):
                 self.state["processed_ids"] = self.state["processed_ids"][-300:]
             self._save_state()
 
-    async def fetch_notifications(self, send_telegram: Callable[[dict[str, Any], str, str], Coroutine[Any, Any, None]]):
+    async def fetch_notifications(self, notifiers: list[Callable[[dict[str, Any], str, str, str], Coroutine[Any, Any, None]]]):
         if self.should_run:
             self.state["last_run"] = time.time()
             self._save_state()
-            await self.process(send_telegram)
+            await self.process(notifiers)
         else:
             console.print(f"{self.tracker}: Skipping check, last run was too recent.")
 
     async def process(
         self,
-        send_telegram: Callable[[dict[str, Any], str, str], Coroutine[Any, Any, None]],
+        notifiers: list[Callable[[dict[str, Any], str, str, str], Coroutine[Any, Any, None]]],
     ) -> None:
         """Main loop to fetch and process notifications."""
         try:
-            all_items = await self._fetch_items()
+            all_items: list[dict[str, Any]] = await self._fetch_items()
 
             for item in all_items:
                 if not self.first_run:
-                    await send_telegram(item, self.tracker, item["url"])
-                    await asyncio.sleep(3)
+                    for notifier in notifiers:
+                        await notifier(
+                            item,
+                            self.tracker,
+                            self.base_url,
+                            item["url"],
+                        )
+                        await asyncio.sleep(3)
                 await self._ack_item(item)
 
         except Exception as e:

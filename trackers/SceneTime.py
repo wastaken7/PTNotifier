@@ -19,8 +19,8 @@ class SceneTime(BaseTracker):
     def __init__(self, cookie_path: Path):
         super().__init__(
             cookie_path,
-            "SceneTime",
-            "https://www.scenetime.com/",
+            tracker_name="SceneTime",
+            base_url="https://www.scenetime.com/",
         )
         self.inbox_url = urljoin(self.base_url, "inbox.php")
 
@@ -68,7 +68,7 @@ class SceneTime(BaseTracker):
                     "type": "message",
                     "id": item_id,
                     "title": sender,
-                    "msg": subject,
+                    "subject": subject,
                     "date": date_str,
                     "url": link,
                     "is_staff": False,

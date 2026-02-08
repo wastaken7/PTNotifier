@@ -20,8 +20,8 @@ class TorrentLeech(BaseTracker):
     def __init__(self, cookie_path: Path):
         super().__init__(
             cookie_path,
-            "TorrentLeech",
-            "https://www.torrentleech.org/"
+            tracker_name="TorrentLeech",
+            base_url="https://www.torrentleech.org/",
         )
 
     async def _fetch_items(self) -> list[dict[str, Any]]:
@@ -29,7 +29,7 @@ class TorrentLeech(BaseTracker):
         if not self.state.get("notifications_url"):
             soup = await self._fetch_page(self.base_url, "user ID")
             if soup:
-                profile_link = soup.find("span", class_="link", onclick=lambda x: x and "/profile/" in x)
+                profile_link = soup.find("span", class_="link", onclick=lambda x: bool(x and "/profile/" in x))
                 if profile_link:
                     onclick_attr = str(profile_link.get("onclick", ""))
                     match = re.search(r"/profile/([^/]+)/", onclick_attr)
@@ -91,7 +91,7 @@ class TorrentLeech(BaseTracker):
                     "type": "notification",
                     "id": item_id,
                     "title": "System",
-                    "msg": message_text,
+                    "subject": message_text,
                     "date": date_str,
                     "url": link,
                     "is_staff": False,

@@ -19,8 +19,8 @@ class TorrentDay(BaseTracker):
     def __init__(self, cookie_path: Path):
         super().__init__(
             cookie_path,
-            "TorrentDay",
-            "https://www.torrentday.com/",
+            tracker_name="TorrentDay",
+            base_url="https://www.torrentday.com/",
         )
         self.inbox_url = "https://www.torrentday.com/m"
 
@@ -71,7 +71,7 @@ class TorrentDay(BaseTracker):
                     "type": "message",
                     "id": item_id,
                     "title": "Unknown",
-                    "msg": subject,
+                    "subject": subject,
                     "date": date_str,
                     "url": link,
                     "is_staff": False,

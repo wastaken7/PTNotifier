@@ -15,8 +15,8 @@ class March(BaseTracker):
     def __init__(self, cookie_path: Path):
         super().__init__(
             cookie_path,
-            "March",
-            "https://duckboobee.org/",
+            tracker_name="March",
+            base_url="https://duckboobee.org/",
         )
         self.inbox_url = urljoin(self.base_url, "messages.php")
 
@@ -63,7 +63,7 @@ class March(BaseTracker):
                     "type": "message",
                     "id": str(item_id),
                     "title": sender,
-                    "msg": subject,
+                    "subject": subject,
                     "date": date_str,
                     "url": link,
                     "is_staff": False,

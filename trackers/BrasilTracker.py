@@ -17,7 +17,11 @@ class BrasilTracker(BaseTracker):
     """
 
     def __init__(self, cookie_path: Path):
-        super().__init__(cookie_path, "BrasilTracker", "https://brasiltracker.org/")
+        super().__init__(
+            cookie_path,
+            tracker_name="BrasilTracker",
+            base_url="https://brasiltracker.org/",
+        )
         self.inbox_url = urljoin(self.base_url, "inbox.php")
         self.staff_url = urljoin(self.base_url, "staffpm.php")
 
@@ -30,7 +34,8 @@ class BrasilTracker(BaseTracker):
     async def _parse_messages(self, url: str, is_staff: bool) -> list[dict[str, Any]]:
         """Parses message tables for Brasil Tracker structure."""
         new_items: list[dict[str, Any]] = []
-        soup = await self._fetch_page(url, "messages")
+        message_type = "messages" if not is_staff else "staff messages"
+        soup = await self._fetch_page(url, message_type)
         if not soup or not soup.find(id="messageform"):
             return new_items
 
@@ -68,8 +73,8 @@ class BrasilTracker(BaseTracker):
                     {
                         "type": "message",
                         "id": item_id,
-                        "title": sender,
-                        "msg": subject,
+                        "sender": sender,
+                        "subject": subject,
                         "date": date_str,
                         "url": link,
                         "is_staff": is_staff,

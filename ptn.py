@@ -4,18 +4,23 @@ import asyncio
 import contextlib
 import glob
 import importlib
+import os
 import pkgutil
 import subprocess
+from collections.abc import Coroutine
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 import httpx
 from rich.console import Console
 
+from apps.discord import send_discord
+from apps.telegram import send_telegram
+
 console = Console()
 
 try:
-    import config
+    import config as _imported_config
 except ImportError:
     console.print("[yellow]config.py not found. Creating from example-config.py...[/yellow]")
     console.print("[yellow]Please edit config.py with your settings before running again.[/yellow]")
@@ -24,16 +29,18 @@ except ImportError:
     shutil.copyfile("example-config.py", "config.py")
     exit(1)
 
+user_config: dict[str, Any] = _imported_config.SETTINGS
+
 COOKIES_DIR = Path("./cookies")
 STATE_DIR = Path("./state")
 STATE_DIR.mkdir(exist_ok=True)
 COOKIES_DIR.mkdir(exist_ok=True)
+TELEGRAM_BOT_TOKEN = user_config.get("TELEGRAM_BOT_TOKEN")
+TELEGRAM_CHAT_ID = user_config.get("TELEGRAM_CHAT_ID")
+DISCORD_WEBHOOK_URL = user_config.get("DISCORD_WEBHOOK_URL")
+CHECK_INTERVAL = user_config.get("CHECK_INTERVAL", 900.0)
+MARK_AS_READ = user_config.get("MARK_AS_READ", False)
 
-TELEGRAM_BOT_TOKEN = config.SETTINGS.get("TELEGRAM_BOT_TOKEN")
-TELEGRAM_CHAT_ID = config.SETTINGS.get("TELEGRAM_CHAT_ID")
-TELEGRAM_TOPIC_ID = config.SETTINGS.get("TELEGRAM_TOPIC_ID")
-CHECK_INTERVAL = config.SETTINGS.get("CHECK_INTERVAL", 900.0)
-MARK_AS_READ = config.SETTINGS.get("MARK_AS_READ", False)
 
 async def check_version():
     """Checks for new versions of the script on GitHub.s"""
@@ -54,52 +61,9 @@ async def check_version():
         console.print("Make sure git is installed and you have internet connectivity.")
 
 
-if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
-    console.print("Error: [bold red]TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID must be set in config.py[/bold red]")
+if (not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID) and not DISCORD_WEBHOOK_URL:
+    console.print("Error: [bold red]Please set TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID or DISCORD_WEBHOOK_URL in config.py[/bold red]")
     exit(1)
-
-
-async def send_telegram(item: dict[str, str], domain: str, notifications_url: str):
-    """
-    Sends a formatted notification to Telegram.
-    """
-    if item["type"] == "notification":
-        text = (
-            f"🔔 <b>{domain}</b>\n\n"
-            f"📌 <b>{item['title']}</b>\n\n"
-            f"<b>Message:</b> {item['msg']}\n\n"
-            f"{item['date']}"  # fmt: skip
-        )
-
-    elif item["type"] == "message":
-        staff_tag = "⚠ <b>STAFF MESSAGE</b> ⚠\n\n" if item.get("is_staff") else ""
-        body = f"<b>Body:</b> {item.get('body', '')}\n\n" if item.get("body") else ""
-
-        text = (
-            f"📩 <b>{domain}</b>\n\n"
-            f"{staff_tag}"
-            f"👤 <b>{item['title']}</b>\n\n"
-            f"<b>Text:</b> {item['msg']}\n\n"
-            f"{body}"
-            f"{item['date']}"  # fmt: skip
-        )
-
-    keyboard = {"inline_keyboard": [[{"text": "Open Notification", "url": notifications_url}]]}
-
-    payload = {"chat_id": TELEGRAM_CHAT_ID, "text": text, "parse_mode": "HTML", "reply_markup": keyboard}
-
-    if TELEGRAM_TOPIC_ID:
-        payload["message_thread_id"] = TELEGRAM_TOPIC_ID
-
-    async with httpx.AsyncClient() as tg_client:
-        try:
-            url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-            resp = await tg_client.post(url, json=payload)
-            resp.raise_for_status()
-            if not resp.is_success:
-                console.print(f"[bold red]Telegram Error[/bold red]: {resp.text}")
-        except Exception as e:
-            console.print(f"[bold red]Telegram Exception[/bold red]: {e}")
 
 
 def load_trackers() -> dict[str, Any]:
@@ -135,8 +99,14 @@ async def main():
     console.print("Starting PTNotifier...")
     tracker_classes = load_trackers()
 
+    notifiers: list[Callable[[dict[str, Any], str, str, str], Coroutine[Any, Any, None]]] = []
+    if TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID:
+        notifiers.append(send_telegram)
+    if DISCORD_WEBHOOK_URL:
+        notifiers.append(send_discord)
+
     while True:
-        tasks = []
+        tasks: list[Any] = []
         for tracker_name, tracker_class in tracker_classes.items():
             cookie_files = glob.glob(str(COOKIES_DIR / tracker_name.upper() / "*.txt"))
             if not cookie_files:
@@ -144,7 +114,7 @@ async def main():
 
             for f in cookie_files:
                 tracker_instance = tracker_class(Path(f))
-                tasks.append(tracker_instance.fetch_notifications(send_telegram))
+                tasks.append(tracker_instance.fetch_notifications(notifiers))
 
         # Handle Other directory
         other_cookie_files = glob.glob(str(COOKIES_DIR / "Other" / "*.txt"))
@@ -154,7 +124,7 @@ async def main():
             tracker_class = tracker_classes.get(tracker_name_from_file)
             if tracker_class:
                 tracker_instance = tracker_class(cookie_path)
-                tasks.append(tracker_instance.fetch_notifications(send_telegram))
+                tasks.append(tracker_instance.fetch_notifications(notifiers))
             else:
                 console.print(f"[bold red]No tracker class found for cookie file: {cookie_path.name}[/bold red]")
 
@@ -179,6 +149,13 @@ async def main():
         except Exception as e:
             console.print(f"[bold red]An unexpected error occurred during sleep:[/bold red] {e}")
             await asyncio.sleep(60)
+
+        # Clear the user console after each check cycle
+        clear_terminal()
+
+
+def clear_terminal():
+    os.system("cls" if os.name == "nt" else "clear")
 
 
 if __name__ == "__main__":

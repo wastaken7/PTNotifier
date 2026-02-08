@@ -1,19 +1,19 @@
 # PTNotifier (Private Tracker Notifier)
 
-PTNotifier is a Python-based tool designed to monitor private torrent trackers for new notifications and private messages, sending alerts to a specified Telegram chat.
+PTNotifier is a Python-based tool designed to monitor private torrent trackers for new notifications and private messages, sending alerts to a specified Telegram and/or Discord chat.
 
 ## How It Works
 
 The script dynamically loads tracker modules from the `trackers/` directory. For each tracker, it uses stored browser cookies to authenticate and then scrapes the notifications and messages pages for unread items. It maintains a simple state file for each tracker to keep track of processed items, ensuring that notifications are sent only once.
 
-New notifications are formatted and sent to a Telegram chat via a bot. The script runs in a continuous loop, with a configurable interval between checks.
+New notifications are formatted and sent to a Telegram chat or a Discord channel via a bot or a webhook. The script runs in a continuous loop, with a configurable interval between checks.
 
 ## Features
 
 -   Monitors multiple private trackers simultaneously.
 -   Sends notifications for new site alerts and private messages.
 -   Easy to configure via a `config.py` file.
--   Uses Telegram for notifications.
+-   Uses Telegram and/or Discord for notifications.
 -   Dynamically loads tracker modules.
 
 ## Supported Trackers
@@ -78,12 +78,27 @@ You can receive notifications in a private chat or a group.
 
 </details>
 
+### Discord Webhook Setup
+
+<details>
+<summary>Click to reveal instructions for creating a Discord Webhook</summary>
+
+1. Open the Discord channel where you want to receive notifications.
+2. From the channel menu, select **Edit channel**.
+3. Select **Integrations**.
+4. Select **Webhooks**.
+5. Click **New Webhook**.
+6. Set a name for the webhook (e.g., PTNotifier).
+7. Click **Copy Webhook URL**. This is your **`DISCORD_WEBHOOK_URL`**.
+
+</details>
+
 Follow these steps to set up PTNotifier.
 
 ### 1. Prerequisites
 
 -   Python 3.8+
--   A Telegram Bot Token and a Chat ID.
+-   A Telegram Bot Token and a Chat ID, and/or a Discord Webhook URL.
 
 ### 2. Clone the Repository
 
@@ -113,6 +128,7 @@ The first time you run the script, it will create a `config.py` file from `examp
 
 -   **`TELEGRAM_BOT_TOKEN`**: Your Telegram bot's API token.
 -   **`TELEGRAM_CHAT_ID`**: The ID of the Telegram chat where you want to receive notifications. You can also provide a `TELEGRAM_TOPIC_ID` if you want to send messages to a specific topic in a group.
+-   **`DISCORD_WEBHOOK_URL`**: Your Discord webhook URL.
 -   **`CHECK_INTERVAL`**: The time in seconds between checks. The minimum is 900 seconds (15 minutes) to avoid spamming trackers.
 -   **`MARK_AS_READ`**: (Optional) For some trackers, the script can attempt to mark notifications as read. Set to `True` or `False`.
 -   **`TIMEOUT`**: The timeout in seconds for network requests.

@@ -15,8 +15,8 @@ class PTSKit(BaseTracker):
     def __init__(self, cookie_path: Path):
         super().__init__(
             cookie_path,
-            "PTSKit",
-            "https://www.ptskit.org/",
+            tracker_name="PTSKit",
+            base_url="https://www.ptskit.org/",
         )
         self.inbox_url = urljoin(self.base_url, "messages.php")
 
@@ -59,7 +59,7 @@ class PTSKit(BaseTracker):
                     "type": "message",
                     "id": str(item_id),
                     "title": sender,
-                    "msg": subject,
+                    "subject": subject,
                     "date": date_str,
                     "url": full_link,
                     "is_staff": False,
