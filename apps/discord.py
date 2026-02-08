@@ -24,7 +24,7 @@ async def send_discord(
 
     icon = "🔔" if item["type"] == "notification" else "📩"
 
-    description = f"### {icon}  New {item['type'].capitalize()}\n\n\n"
+    description = f"{icon} **New {item['type'].capitalize()}**\n\n\n"
 
     if item.get("is_staff"):
         description += "⚠️ **STAFF MESSAGE** ⚠️\n\n"
