@@ -3,6 +3,7 @@
 from pathlib import Path
 from typing import Any
 
+from bs4 import BeautifulSoup
 from rich.console import Console
 
 from .base import BaseTracker
@@ -42,7 +43,8 @@ class AvistaZ(BaseTracker):
 
     async def _fetch_and_parse_notifications(self) -> list[dict[str, Any]]:
         new_items: list[dict[str, Any]] = []
-        soup = await self._fetch_page(self.notifications_url, "notifications")
+        response = await self._fetch_page(self.notifications_url, "notifications")
+        soup = BeautifulSoup(response, "html.parser")
         if not soup:
             return new_items
 
@@ -84,7 +86,8 @@ class AvistaZ(BaseTracker):
 
     async def _fetch_and_parse_messages(self) -> list[dict[str, Any]]:
         new_items: list[dict[str, Any]] = []
-        soup = await self._fetch_page(self.messages_url, "messages")
+        response = await self._fetch_page(self.messages_url, "messages")
+        soup = BeautifulSoup(response, "html.parser")
         if not soup:
             return new_items
 

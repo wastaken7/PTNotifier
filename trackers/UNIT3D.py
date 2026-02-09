@@ -54,7 +54,8 @@ class UNIT3D(BaseTracker):
                 self._save_state()
                 return
 
-        soup = await self._fetch_page(self.base_url, "user ID")
+        response = await self._fetch_page(self.base_url, "user ID")
+        soup = BeautifulSoup(response, "html.parser")
         if not soup:
             console.print(f"{self.domain}: [bold red]Initialization failed.[/bold red]")
             return
@@ -96,7 +97,8 @@ class UNIT3D(BaseTracker):
     ) -> list[dict[str, Any]]:
         if not url:
             return []
-        soup = await self._fetch_page(url, request_type)
+        response = await self._fetch_page(url, request_type)
+        soup = BeautifulSoup(response, "html.parser")
         if soup:
             return parse_func(soup)
         return []

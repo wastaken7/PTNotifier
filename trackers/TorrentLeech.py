@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urljoin
 
+from bs4 import BeautifulSoup
 from rich.console import Console
 
 from .base import BaseTracker
@@ -27,7 +28,8 @@ class TorrentLeech(BaseTracker):
     async def _fetch_items(self) -> list[dict[str, Any]]:
         """Fetch notifications from TorrentLeech profile."""
         if not self.state.get("notifications_url"):
-            soup = await self._fetch_page(self.base_url, "user ID")
+            response = await self._fetch_page(self.base_url, "user ID")
+            soup = BeautifulSoup(response, "html.parser")
             if soup:
                 profile_link = soup.find("span", class_="link", onclick=lambda x: bool(x and "/profile/" in x))
                 if profile_link:
@@ -48,7 +50,8 @@ class TorrentLeech(BaseTracker):
     async def _parse_notifications(self, url: str) -> list[dict[str, Any]]:
         """Parses the notifications table for TorrentLeech."""
         new_items: list[dict[str, Any]] = []
-        soup = await self._fetch_page(url, "notifications")
+        response = await self._fetch_page(url, "notifications")
+        soup = BeautifulSoup(response, "html.parser")
 
         if not soup:
             return new_items

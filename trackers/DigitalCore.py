@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import json
 import re
 import time
 from pathlib import Path
@@ -7,8 +8,6 @@ from typing import Any
 from urllib.parse import urljoin
 
 from rich.console import Console
-
-import config
 
 from .base import BaseTracker
 
@@ -31,22 +30,6 @@ class DigitalCore(BaseTracker):
         self.mailbox_api = urljoin(self.base_url, "/api/v1/mailbox?index=0&limit=20&location=0")
         self.notifications_api = urljoin(self.base_url, "/api/v1/notifications?index=0&limit=20&toReturn=all")
 
-    async def _fetch_api(self, url: str) -> Any:
-        """Fetches data from an API endpoint."""
-        config_timeout = config.SETTINGS.get("TIMEOUT", 30.0)
-        try:
-            config_timeout = float(str(config_timeout))
-        except (ValueError, TypeError):
-            config_timeout = 30
-        try:
-            console.print(f"{self.tracker}: [blue]Checking for {'messages' if 'mailbox' in url else 'notifications'}...[/blue]")
-            response = await self.client.get(url, timeout=config_timeout)
-            response.raise_for_status()
-            return response.json()
-        except Exception as e:
-            console.print(f"{self.tracker}: [bold red]Error fetching API {url}:[/bold red] {e}")
-            return None
-
     async def _fetch_items(self) -> list[dict[str, Any]]:
         """Fetch messages and notifications from DigitalCore API."""
         mailbox_items = await self._fetch_mailbox()
@@ -56,16 +39,24 @@ class DigitalCore(BaseTracker):
     async def _fetch_mailbox(self) -> list[dict[str, Any]]:
         """Parses the mailbox API response."""
         new_items: list[dict[str, Any]] = []
-        data = await self._fetch_api(self.mailbox_api)
+        data = await self._fetch_page(self.mailbox_api, "messages")
+
+        try:
+            data = json.loads(data)
+        except Exception:
+            console.print(f"{self.tracker}: [bold red]Failed to parse mailbox JSON.[/bold red]")
+            return new_items
+
         if not data:
             return new_items
 
+        msg: dict[str, Any]
         for msg in data:
             item_id = str(msg.get("id"))
             if item_id in self.state["processed_ids"]:
                 continue
 
-            sender = msg.get("user", {}).get("username", "System")
+            sender = dict(msg.get("user", {})).get("username", "System")
             subject = msg.get("subject", "No Subject")
             link = urljoin(self.base_url, f"/mailbox/{item_id}")
             clean_body = re.sub(r"\[.*?\]", "", msg.get("body", "")).strip()
@@ -86,10 +77,18 @@ class DigitalCore(BaseTracker):
     async def _fetch_notifications(self) -> list[dict[str, Any]]:
         """Parses the notifications API response."""
         new_items: list[dict[str, Any]] = []
-        data = await self._fetch_api(self.notifications_api)
+        data = await self._fetch_page(self.mailbox_api, "notifications")
+
+        try:
+            data = json.loads(data)
+        except Exception:
+            console.print(f"{self.tracker}: [bold red]Failed to parse notifications JSON.[/bold red]")
+            return new_items
+
         if not data:
             return new_items
 
+        notif: dict[str, Any]
         for notif in data:
             item_id = f"notif_{notif.get('id')}"
             if item_id in self.state["processed_ids"]:

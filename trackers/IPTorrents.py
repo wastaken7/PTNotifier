@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urljoin
 
+from bs4 import BeautifulSoup
 from rich.console import Console
 
 from .base import BaseTracker
@@ -31,7 +32,8 @@ class IPTorrents(BaseTracker):
     async def _parse_messages(self, url: str) -> list[dict[str, Any]]:
         """Parses the message list structure from IPTorrents HTML."""
         new_items: list[dict[str, Any]] = []
-        soup = await self._fetch_page(url, "messages")
+        response = await self._fetch_page(url, "messages")
+        soup = BeautifulSoup(response, "html.parser")
 
         if not soup:
             return new_items

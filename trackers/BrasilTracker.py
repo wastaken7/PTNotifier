@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urljoin
 
+from bs4 import BeautifulSoup
 from rich.console import Console
 
 from .base import BaseTracker
@@ -35,7 +36,9 @@ class BrasilTracker(BaseTracker):
         """Parses message tables for Brasil Tracker structure."""
         new_items: list[dict[str, Any]] = []
         message_type = "messages" if not is_staff else "staff messages"
-        soup = await self._fetch_page(url, message_type)
+        response = await self._fetch_page(url, message_type)
+        soup = BeautifulSoup(response, "html.parser")
+
         if not soup or not soup.find(id="messageform"):
             return new_items
 

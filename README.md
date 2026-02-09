@@ -44,6 +44,7 @@ These are specific trackers that have their own dedicated module. The cookie fil
 | `IPTorrents.py` | `iptorrents.com`| `IPTorrents.txt` | - |
 | `Lajidui.py` | `pt.lajidui.top`| `Lajidui.txt` | - |
 | `March.py` | `duckboobee.org`| `March.txt` | - |
+| `Orpheus.py` | `orpheus.network`| `Orpheus.txt` | It is necessary to add an API key in config.py |
 | `PTFans.py` | `ptfans.cc`| `PTFans.txt` | - |
 | `PTSKit.py` | `ptskit.org`| `PTSKit.txt` | - |
 | `SceneTime.py` | `scenetime.com`| `SceneTime.txt` | - |

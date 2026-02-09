@@ -30,6 +30,7 @@ except ImportError:
     exit(1)
 
 user_config: dict[str, Any] = _imported_config.SETTINGS
+api_tokens: dict[str, str] = _imported_config.API_TOKENS
 
 COOKIES_DIR = Path("./cookies")
 STATE_DIR = Path("./state")

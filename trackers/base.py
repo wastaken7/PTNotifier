@@ -10,7 +10,6 @@ from pathlib import Path
 from typing import Any, Callable, Optional
 
 import httpx
-from bs4 import BeautifulSoup
 from rich.console import Console
 
 import config
@@ -36,8 +35,7 @@ class BaseTracker(ABC):
         if custom_headers is None:
             custom_headers = {}
         self.tracker = tracker_name
-        self.cookie_path = cookie_path
-        self.filename = cookie_path.name
+
         self.base_url = base_url
 
         self.state_path = Path("./state") / f"{self.tracker}.json"
@@ -52,6 +50,8 @@ class BaseTracker(ABC):
 
         self.should_run = time.time() - self.state.get("last_run", 0) >= min_run_interval
 
+        self.cookie_path = cookie_path
+        self.filename = cookie_path.name
         self.cookie_jar = MozillaCookieJar(self.cookie_path)
         try:
             self.cookie_jar.load(ignore_discard=True, ignore_expires=True)
@@ -163,7 +163,7 @@ class BaseTracker(ABC):
             console.print(f"[bold red]Error reading domain from {cookie_path.name}:[/bold red] {e}")
         return ""
 
-    async def _fetch_page(self, url: str, request_type: str) -> Optional[BeautifulSoup]:
+    async def _fetch_page(self, url: str, request_type: str) -> str:
         try:
             delay = float(str(config.SETTINGS.get("REQUEST_DELAY", 5.0)))
             timeout = float(str(config.SETTINGS.get("TIMEOUT", 30.0)))
@@ -184,10 +184,10 @@ class BaseTracker(ABC):
                 console.print(f"{self.tracker}: [blue]Checking for {request_type}...[/blue]")
                 response = await self.client.get(url, timeout=timeout)
                 response.raise_for_status()
-                return BeautifulSoup(response.text, "html.parser")
+                return response.text
             except httpx.HTTPStatusError as e:
                 console.print(f"{self.tracker}: [bold red]HTTP error [/bold red]{e.response.status_code}")
             except Exception as e:
                 console.print(f"{self.tracker}: [bold red]Error: [/bold red]{e}")
 
-            return None
+        return ""

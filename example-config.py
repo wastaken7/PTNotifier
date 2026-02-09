@@ -19,3 +19,8 @@ SETTINGS: dict[str, Any] = {
     # Default is 5 seconds
     "REQUEST_DELAY": 5.0,
 }
+
+API_TOKENS: dict[str, str] = {
+    # Although Orpheus supports API, you still need to export cookies.
+    "Orpheus": "",
+}

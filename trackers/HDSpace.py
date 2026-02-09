@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urljoin
 
+from bs4 import BeautifulSoup
 from rich.console import Console
 
 from .base import BaseTracker
@@ -26,7 +27,9 @@ class HDSpace(BaseTracker):
     async def _fetch_items(self) -> list[dict[str, Any]]:
         """Fetch messages from HD-Space mailbox."""
         if not self.state.get("notifications_url"):
-            soup = await self._fetch_page(self.base_url, "user ID")
+            response = await self._fetch_page(self.base_url, "user ID")
+            soup = BeautifulSoup(response, "html.parser")
+
             if soup:
                 user_cp_link = soup.find("a", href=lambda h: bool(h and "page=usercp&uid=" in h))
                 if user_cp_link:
@@ -46,7 +49,8 @@ class HDSpace(BaseTracker):
     async def _parse_messages(self, url: str) -> list[dict[str, Any]]:
         """Parses the XBTIT style message table for HD-Space."""
         new_items: list[dict[str, Any]] = []
-        soup = await self._fetch_page(url, "messages")
+        response = await self._fetch_page(url, "messages")
+        soup = BeautifulSoup(response, "html.parser")
 
         form = soup.find("form", attrs={"name": "deleteall"}) if soup else None
         if not form:
