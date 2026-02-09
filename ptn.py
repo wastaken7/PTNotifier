@@ -29,8 +29,13 @@ except ImportError:
     shutil.copyfile("example-config.py", "config.py")
     exit(1)
 
-user_config: dict[str, Any] = _imported_config.SETTINGS
-api_tokens: dict[str, str] = _imported_config.API_TOKENS
+try:
+    user_config: dict[str, Any] = _imported_config.SETTINGS
+    api_tokens: dict[str, str] = _imported_config.API_TOKENS
+except Exception as e:
+    console.print(f"[bold red]Error loading config.py:[/bold red] {e}")
+    console.print("[bold red]Check example-config.py for any missing fields.[/bold red]")
+    exit(1)
 
 COOKIES_DIR = Path("./cookies")
 STATE_DIR = Path("./state")
