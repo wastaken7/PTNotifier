@@ -22,6 +22,7 @@ class BJShare(BaseTracker):
             cookie_path,
             tracker_name="BJ-Share",
             base_url="https://bj-share.info/",
+            scrape_interval=3600,
         )
         self.inbox_url = urljoin(self.base_url, "inbox.php")
         self.staff_url = urljoin(self.base_url, "staffpm.php")

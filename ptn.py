@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import asyncio
-import contextlib
 import glob
 import importlib
 import os
@@ -136,22 +135,15 @@ async def main():
 
         if tasks:
             try:
-                await asyncio.gather(*tasks)
+                await asyncio.gather(*tasks, return_exceptions=True)
             except Exception as e:
                 console.print(f"[bold red]An unexpected error occurred while gathering tracker tasks:[/bold red] {e}")
         else:
             console.print("[yellow]No trackers loaded. Waiting...[/yellow]")
 
-        minimum_interval = 900.0
-        current_interval = minimum_interval
-        with contextlib.suppress(ValueError, TypeError):
-            interval_from_config = float(CHECK_INTERVAL)
-            if interval_from_config > minimum_interval:
-                current_interval = interval_from_config
-
-        console.print(f"[green]Sleeping for {current_interval / 60.0} minutes...[/green]")
+        console.print("[green]Sleeping for 60 seconds...[/green]")
         try:
-            await asyncio.sleep(current_interval)
+            await asyncio.sleep(60)
         except Exception as e:
             console.print(f"[bold red]An unexpected error occurred during sleep:[/bold red] {e}")
             await asyncio.sleep(60)

@@ -18,7 +18,12 @@ class AvistaZ(BaseTracker):
 
     def __init__(self, cookie_path: Path):
         self.domain = self._extract_domain_from_cookie(cookie_path)
-        super().__init__(cookie_path, self.domain, f"https://{self.domain}/")
+        super().__init__(
+            cookie_path,
+            self.domain,
+            f"https://{self.domain}/",
+            scrape_interval=3600,
+        )
 
         self.notifications_url = self.base_url + "notifications"
         self.messages_url = self.base_url + "messenger"

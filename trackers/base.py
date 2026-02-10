@@ -31,28 +31,18 @@ class BaseTracker(ABC):
         tracker_name: str,
         base_url: str,
         custom_headers: Optional[dict[str, str]] = None,
+        scrape_interval: float = 1800.0,
     ):
         if custom_headers is None:
             custom_headers = {}
         self.tracker = tracker_name
-
-        self.base_url = base_url
-
-        self.state_path = Path("./state") / f"{self.tracker}.json"
-        self.first_run = False
-        self.last_request_time: float = 0.0
-        self.state: dict[str, Any] = self._load_state()
-
-        try:
-            min_run_interval = float(str(config.SETTINGS.get("CHECK_INTERVAL", 1800.0)))
-        except (ValueError, TypeError):
-            min_run_interval = 1800.0
-
-        self.should_run = time.time() - self.state.get("last_run", 0) >= min_run_interval
-
+        self.scrape_interval = scrape_interval
         self.cookie_path = cookie_path
         self.filename = cookie_path.name
         self.cookie_jar = MozillaCookieJar(self.cookie_path)
+        self.base_url = base_url
+        self.state_path = Path("./state") / f"{self.tracker}.json"
+        self.state: dict[str, Any] = self._load_state()
         try:
             self.cookie_jar.load(ignore_discard=True, ignore_expires=True)
         except Exception as e:
@@ -110,12 +100,14 @@ class BaseTracker(ABC):
             self._save_state()
 
     async def fetch_notifications(self, notifiers: list[Callable[[dict[str, Any], str, str, str], Coroutine[Any, Any, None]]]):
-        if self.should_run:
+        if time.time() - self.state.get("last_run", 0) >= self.scrape_interval:
             self.state["last_run"] = time.time()
             self._save_state()
             await self.process(notifiers)
         else:
-            console.print(f"{self.tracker}: Skipping check, last run was too recent.")
+            remaining_time = self.state.get("last_run", 0) + self.scrape_interval - time.time()
+            if remaining_time > 0:
+                console.print(f"{self.tracker}: Skipping check, next run in {remaining_time / 60:.2f} minutes.")
 
     async def process(
         self,

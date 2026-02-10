@@ -131,7 +131,7 @@ The first time you run the script, it will create a `config.py` file from `examp
 -   **`TELEGRAM_BOT_TOKEN`**: Your Telegram bot's API token.
 -   **`TELEGRAM_CHAT_ID`**: The ID of the Telegram chat where you want to receive notifications. You can also provide a `TELEGRAM_TOPIC_ID` if you want to send messages to a specific topic in a group.
 -   **`DISCORD_WEBHOOK_URL`**: Your Discord webhook URL.
--   **`CHECK_INTERVAL`**: The time in seconds between checks. The minimum is 900 seconds (15 minutes) to avoid spamming trackers.
+-   **`CHECK_INTERVAL`**: The time in seconds between checks. The minimum is 900 seconds (15 minutes) to avoid spamming trackers. Please note that some trackers have specific rules regarding the frequency of automated requests, and PTN will automatically adjust the interval if it is set too low for that specific tracker.
 -   **`MARK_AS_READ`**: (Optional) For some trackers, the script can attempt to mark notifications as read. Set to `True` or `False`.
 -   **`TIMEOUT`**: The timeout in seconds for network requests.
 -   **`REQUEST_DELAY`**: Delay in seconds between requests to avoid being rate-limited.
