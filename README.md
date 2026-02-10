@@ -34,6 +34,7 @@ These are specific trackers that have their own dedicated module. The cookie fil
 | :--- | :--- | :--- | :--- |
 | `AmigosShareClub.py` | `cliente.amigos-share.club`| `AmigosShareClub.txt` | - |
 | `Anthelion.py` | `anthelion.me` | `Anthelion.txt` | - |
+| `BJShare.py` | `bj-share.info`| `BJShare.txt` | - |
 | `BrasilTracker.py` | `brasiltracker.org` | `BrasilTracker.txt` | - |
 | `DigitalCore.py` | `digitalcore.club`| `DigitalCore.txt` | - |
 | `GreatPosterWall.py` | `greatposterwall.com`| `GreatPosterWall.txt` | - |
