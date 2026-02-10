@@ -22,7 +22,6 @@ class AvistaZ(BaseTracker):
             cookie_path,
             self.domain,
             f"https://{self.domain}/",
-            scrape_interval=3600,
         )
 
         self.notifications_url = self.base_url + "notifications"
