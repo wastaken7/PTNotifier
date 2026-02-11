@@ -103,7 +103,7 @@ class AvistaZ(BaseTracker):
         if not tbody:
             return new_items
 
-        rows = tbody.find_all("tr")
+        rows = tbody.find_all("tr", class_="info text-bold")
         for row in rows:
             cols = row.find_all("td")
             if len(cols) < 5:
@@ -115,20 +115,38 @@ class AvistaZ(BaseTracker):
                 continue
 
             subject = subject_cell.get_text(strip=True)
-            link = subject_cell["href"]
+            link = str(subject_cell["href"])
             age = cols[4].get_text(strip=True)
 
-            if link in self.state["processed_ids"]:
-                continue
+            body = await self._fetch_body(link)
 
             new_items.append(
                 {
+                    "favicon": self.get_favicon(),
                     "type": "message",
                     "id": link,
                     "sender": sender,
                     "subject": subject,
+                    "body": body,
                     "date": age,
                     "url": link,
                 }
             )
         return new_items
+
+    async def _fetch_body(self, url: str) -> str:
+        """
+        Fetches and parses the content of a specific message.
+        """
+        try:
+            response = await self._fetch_page(url, "message body")
+            soup = BeautifulSoup(response, "html.parser")
+
+            body_div = soup.find("div", class_="torrent-desc")
+            if body_div:
+                return body_div.get_text(separator="\n\n", strip=True)
+
+            return "No content found."
+        except Exception as e:
+            console.print(f"[red]Error fetching message body from {url}: {e}[/red]")
+            return "Error retrieving message body."

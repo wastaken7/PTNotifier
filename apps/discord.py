@@ -1,4 +1,5 @@
 import json
+import re
 from typing import Any, Optional
 
 import aiofiles
@@ -85,7 +86,8 @@ async def send_discord(
             description += f"**Subject: **{item['subject']}\n\n"
 
         if item.get("body"):
-            description += f"**Body:** {item['body']}\n\n"
+            clean_body = format_for_discord(item.get("body", ""))
+            description += f"**Body:** {clean_body}\n\n"
 
         description += f"[Open Notification]({notifications_url})"
 
@@ -118,3 +120,34 @@ async def send_discord(
             resp.raise_for_status()
         except Exception as e:
             console.print(f"[bold red]Discord Exception[/bold red]: {e}")
+
+def format_for_discord(raw_description: str):
+    """
+    Converts BBCode and HTML to Discord Markdown.
+    """
+    # Bold
+    raw_description = re.sub(r"\[b\](.*?)\[/b\]|<b>(.*?)</b>|<strong>(.*?)</strong>", r"**\1\2\3**", raw_description, flags=re.IGNORECASE)
+
+    # Italic
+    raw_description = re.sub(r"\[i\](.*?)\[/i\]|<i>(.*?)</i>|<em>(.*?)</em>", r"*\1\2\3*", raw_description, flags=re.IGNORECASE)
+
+    # Underline
+    raw_description = re.sub(r"\[u\](.*?)\[/u\]|<u>(.*?)</u>", r"__\1\2__", raw_description, flags=re.IGNORECASE)
+
+    # Strikethrough
+    raw_description = re.sub(r"\[s\](.*?)\[/s\]|<s>(.*?)</s>|<strike>(.*?)</strike>", r"~~\1\2\3~~", raw_description, flags=re.IGNORECASE)
+
+    # 2. Handle Spoilers
+    raw_description = re.sub(r"\[spoiler\](.*?)\[/spoiler\]|<tg-spoiler>(.*?)</tg-spoiler>|<spoiler>(.*?)</spoiler>", r"||\1\2\3||", raw_description, flags=re.IGNORECASE)
+
+    # 3. Handle Links: [text](url) - Discord only supports masked links in Embeds or specific contexts
+    raw_description = re.sub(r'\[url=(.*?)\](.*?)\[/url\]|<a href="(.*?)">(.*?)</a>', r"[\2\4](\1\3)", raw_description, flags=re.IGNORECASE)
+
+    # 4. Handle Code
+    raw_description = re.sub(r"\[code\](.*?)\[/code\]|<code>(.*?)</code>", r"`\1\2`", raw_description, flags=re.IGNORECASE)
+
+    # 5. Remove any remaining BBcode or HTML code
+    raw_description = re.sub(r"<.*?>", "", raw_description)
+    raw_description = re.sub(r"\[.*?\]", "", raw_description)
+
+    return raw_description

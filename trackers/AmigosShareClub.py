@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urljoin
 
+import httpx
 from bs4 import BeautifulSoup
 from rich.console import Console
 
@@ -23,12 +24,61 @@ class AmigosShareClub(BaseTracker):
             tracker_name="AmigosShareClub",
             base_url="https://cliente.amigos-share.club/",
         )
-        self.inbox_url = "https://cliente.amigos-share.club/mensagens.php?do=entrada"
+        self.inbox_url = "https://cliente.amigos-share.club/mensagens.php?do=n_lidas"
 
     async def _fetch_items(self) -> list[dict[str, Any]]:
-        """Fetch messages from ASC inbox."""
+        """Fetch messages from ASC inbox and include their bodies."""
         inbox_items: list[dict[str, Any]] = await self._parse_messages(self.inbox_url)
+
+        for item in inbox_items:
+            item["body"] = await self._fetch_body(item["id"])
+
         return inbox_items
+
+    async def _fetch_body(self, message_id: str) -> str:
+        """
+        Fetches the message body using the internal search API (JSON response)
+        """
+        payload = {"mp": message_id, "type": "entrada"}
+
+        headers = {
+            "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+            "X-Requested-With": "XMLHttpRequest",
+            "User-Agent": "PTNotifier 1.0 (https://github.com/wastaken7/PTNotifier)",
+        }
+
+        try:
+            response = await self.client.post(
+                "https://cliente.amigos-share.club/search.php",
+                data=payload,
+                headers=headers,
+            )
+
+            if response.status_code == 200:
+                data: dict[str, Any] = response.json()
+                full_text = str(data.get("text", "")).strip()
+
+                if not full_text:
+                    return "No content found."
+
+                soup = BeautifulSoup(full_text, "html.parser")
+                full_text = soup.get_text()
+
+                # Ignore content after the history separator
+                history_separator = "============================================"
+                if history_separator in full_text:
+                    return full_text.split(history_separator)[0].strip()
+
+                return full_text
+
+            return f"Error: Received status code {response.status_code}"
+
+        except httpx.RequestError as e:
+            console.print(f"[bold red]Network error fetching message body:[/bold red] {e}")
+            return "Error retrieving content."
+        except Exception as e:
+            console.print(f"[bold red]Unexpected error:[/bold red] {e}")
+            return "Error retrieving content."
 
     async def _parse_messages(self, url: str) -> list[dict[str, Any]]:
         """Parses the inbox for ASC messages."""

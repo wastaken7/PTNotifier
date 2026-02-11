@@ -60,20 +60,17 @@ class IPTorrents(BaseTracker):
             if author_span and author_span.find("i", class_="fa-warning"):
                 is_staff = True
 
-            sub_div = row.find("div", class_="sub")
-            subject = sub_div.get_text(strip=True) if sub_div else "No Subject"
-
             date_el = row.find("span", class_="elapsedDate")
             date_str = date_el.get("title", "") if date_el else "Unknown"
 
             link = urljoin(self.base_url, "inbox")
-
+            body = await self._fetch_body(item_id)
             new_items.append(
                 {
                     "type": "message",
                     "id": item_id,
                     "title": sender,
-                    "subject": subject,
+                    "body": body,
                     "date": date_str,
                     "url": link,
                     "is_staff": is_staff,
@@ -81,3 +78,38 @@ class IPTorrents(BaseTracker):
             )
 
         return new_items
+
+    async def _fetch_body(self, item_id: str) -> str:
+        """
+        Fetches the message body using the IPTorrents XHR API.
+        The API returns a JSON containing HTML instructions.
+        """
+        api_url = urljoin(self.base_url, "API.php")
+
+        payload = {"jxt": "2", "jxw": "c", "i": item_id}
+
+        headers = {
+            "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+            "X-Requested-With": "XMLHttpRequest",
+            "Origin": self.base_url.rstrip("/"),
+            "Referer": self.inbox_url,
+        }
+        try:
+            response = await self.client.post(api_url, data=payload, headers=headers)
+
+            data = response.json()
+
+            if "Fs" in data:
+                for instruction in data["Fs"]:
+                    if instruction[0] == "DOM" and ".msgBody" in str(instruction[1]):
+                        cmd: list[Any] = []
+                        for cmd in instruction[1]:
+                            if cmd and cmd[0] == "html":
+                                body_soup = BeautifulSoup(cmd[1], "html.parser")
+                                body_el = body_soup.find("blockquote", class_="body")
+                                if body_el:
+                                    return body_el.get_text(separator="\n\n", strip=True)
+            return ""
+        except Exception as e:
+            console.print(f"{self.tracker}: [bold red]API Error for {item_id}: {e}[/bold red]")
+            return ""

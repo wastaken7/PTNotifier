@@ -110,7 +110,6 @@ async def main():
         notifiers.append(send_discord)
 
     while True:
-        clear_terminal()
         console.print("[bold blue]Checking trackers...[/bold blue]")
         tasks: list[Any] = []
         for tracker_name, tracker_class in tracker_classes.items():
@@ -156,6 +155,7 @@ async def main():
         except Exception as e:
             console.print(f"[bold red]An unexpected error occurred during sleep:[/bold red] {e}")
             await asyncio.sleep(sleep_time)
+        clear_terminal()
 
 
 def clear_terminal():

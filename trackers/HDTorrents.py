@@ -85,13 +85,14 @@ class HDTorrents(BaseTracker):
 
             sender = cols[1].get_text(strip=True)
             date_str = cols[2].get_text(strip=True).replace("\xa0", " ")
-
+            body = await self._fetch_body(link)
             new_items.append(
                 {
                     "type": "message",
                     "id": item_id,
                     "title": sender,
                     "subject": subject,
+                    "body": body,
                     "date": date_str,
                     "url": link,
                     "is_staff": False,
@@ -99,3 +100,27 @@ class HDTorrents(BaseTracker):
             )
 
         return new_items
+
+    async def _fetch_body(self, url: str) -> str:
+        """Navigates to the message URL and extracts the content body."""
+        try:
+            response = await self._fetch_page(url, "message body")
+            soup = BeautifulSoup(response, "html.parser")
+
+            headers = soup.find_all("td", class_="header")
+
+            for header in headers:
+                header_text = header.get_text()
+                if header_text and "Subject:" in header_text:
+                    parent_row = header.find_parent("tr")
+                    if parent_row:
+                        next_row = parent_row.find_next_sibling("tr")
+                        if next_row:
+                            body_cell = next_row.find("td")
+                            if body_cell:
+                                return body_cell.get_text(separator="\n\n", strip=True)
+
+            return ""
+        except Exception as e:
+            console.print(f"{self.tracker}: [bold red]Failed to fetch body for {url}: {e}[/bold red]")
+            return ""
