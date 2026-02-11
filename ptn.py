@@ -101,7 +101,6 @@ async def main():
     Main execution function that initializes trackers and runs the monitoring loop.
     """
     await check_version()
-    console.print("Starting PTNotifier...")
     tracker_classes = load_trackers()
 
     notifiers: list[Callable[[dict[str, Any], str, str, str], Coroutine[Any, Any, None]]] = []
@@ -111,6 +110,8 @@ async def main():
         notifiers.append(send_discord)
 
     while True:
+        clear_terminal()
+        console.print("[bold blue]Checking trackers...[/bold blue]")
         tasks: list[Any] = []
         for tracker_name, tracker_class in tracker_classes.items():
             cookie_files = glob.glob(str(COOKIES_DIR / tracker_name.upper() / "*.txt"))
@@ -122,7 +123,7 @@ async def main():
                 tasks.append(tracker_instance.fetch_notifications(notifiers))
 
         # Handle Other directory
-        other_cookie_files = glob.glob(str(COOKIES_DIR / "Other" / "*.txt"))
+        other_cookie_files: list[str] = glob.glob(str(COOKIES_DIR / "Other" / "*.txt"))
         for f in other_cookie_files:
             cookie_path = Path(f)
             tracker_name_from_file = cookie_path.stem
@@ -133,23 +134,28 @@ async def main():
             else:
                 console.print(f"[bold red]No tracker class found for cookie file: {cookie_path.name}[/bold red]")
 
+        sleep_time: float
         if tasks:
             try:
-                await asyncio.gather(*tasks, return_exceptions=True)
+                remaining_times = await asyncio.gather(*tasks, return_exceptions=True)
+                # Filter out exceptions and non-float values
+                valid_times: list[float] = [t for t in remaining_times if isinstance(t, (int, float)) and t > 0]
+                sleep_time = min(valid_times) if valid_times else 60
             except Exception as e:
                 console.print(f"[bold red]An unexpected error occurred while gathering tracker tasks:[/bold red] {e}")
+                sleep_time = 60
         else:
             console.print("[yellow]No trackers loaded. Waiting...[/yellow]")
+            sleep_time = 60
 
-        console.print("[green]Sleeping for 60 seconds...[/green]")
+        sleep_time_print = f"{sleep_time:.2f} seconds" if sleep_time <= 60 else f"{sleep_time / 60:.2f} minute{'s' if sleep_time / 60 != 1 else ''}"
+
+        console.print(f"[green]Waiting {sleep_time_print} before checking again...[/green]")
         try:
-            await asyncio.sleep(60)
+            await asyncio.sleep(sleep_time)
         except Exception as e:
             console.print(f"[bold red]An unexpected error occurred during sleep:[/bold red] {e}")
-            await asyncio.sleep(60)
-
-        # Clear the user console after each check cycle
-        clear_terminal()
+            await asyncio.sleep(sleep_time)
 
 
 def clear_terminal():
