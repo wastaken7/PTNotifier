@@ -102,6 +102,10 @@ class UNIT3D(BaseTracker):
 
     def _parse_notifications_html(self, soup: BeautifulSoup) -> list[dict[str, Any]]:
         unread_cells = soup.find_all("td", class_="notification--unread")
+        if not unread_cells:
+            log.error(f"{self.domain}: Error parsing HTML. This likely means that this is a heavily modified version of UNIT3D or that your cookies have expired.")
+            return []
+
         items: list[dict[str, Any]] = []
 
         for cell in unread_cells:
