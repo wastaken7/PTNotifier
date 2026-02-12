@@ -5,11 +5,8 @@ from typing import Any
 from urllib.parse import parse_qs, urljoin, urlparse
 
 from bs4 import BeautifulSoup
-from rich.console import Console
 
-from .base import BaseTracker
-
-console = Console()
+from .base import BaseTracker, log
 
 
 class March(BaseTracker):
@@ -27,7 +24,7 @@ class March(BaseTracker):
 
     async def _parse_messages(self, url: str) -> list[dict[str, Any]]:
         new_items: list[dict[str, Any]] = []
-        response = await self._fetch_page(url, "messages")
+        response = await self._fetch_page(url, "messages", sucess_text="torrents.php")
         soup = BeautifulSoup(response, "html.parser")
 
         if not soup:
@@ -90,6 +87,6 @@ class March(BaseTracker):
                     return body_td.get_text(separator="\n\n", strip=True)
 
             return ""
-        except Exception as e:
-            console.print(f"{self.tracker}: [bold red]Failed to fetch body for {url}: {e}[/bold red]")
+        except Exception:
+            log.error(f"{self.tracker}: Failed to fetch body for {url}:", exc_info=True)
             return ""

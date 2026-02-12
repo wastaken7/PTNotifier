@@ -4,13 +4,10 @@ from pathlib import Path
 from typing import Any, Callable, Optional
 
 from bs4 import BeautifulSoup
-from rich.console import Console
 
 import config
 
-from .base import BaseTracker
-
-console = Console()
+from .base import BaseTracker, log
 
 
 class UNIT3D(BaseTracker):
@@ -43,7 +40,7 @@ class UNIT3D(BaseTracker):
 
     async def initialize(self):
         if not self.domain:
-            console.print(f"[bold red]Initialization failed: Could not determine domain from cookies.[/bold red]: {self.cookie_path}")
+            log.error(f"Initialization failed: Could not determine domain from cookies.: {self.cookie_path}")
             return
 
         if self.notifications_url:
@@ -57,7 +54,7 @@ class UNIT3D(BaseTracker):
         response = await self._fetch_page(self.base_url, "user ID")
         soup = BeautifulSoup(response, "html.parser")
         if not soup:
-            console.print(f"{self.domain}: [bold red]Initialization failed.[/bold red]")
+            log.error(f"{self.domain}: Initialization failed.")
             return
 
         token_tag = soup.find("meta", {"name": "csrf-token"})
@@ -97,7 +94,7 @@ class UNIT3D(BaseTracker):
     ) -> list[dict[str, Any]]:
         if not url:
             return []
-        response = await self._fetch_page(url, request_type)
+        response = await self._fetch_page(url, request_type, sucess_text="general-settings")
         soup = BeautifulSoup(response, "html.parser")
         if soup:
             return parse_func(soup)
@@ -105,6 +102,10 @@ class UNIT3D(BaseTracker):
 
     def _parse_notifications_html(self, soup: BeautifulSoup) -> list[dict[str, Any]]:
         unread_cells = soup.find_all("td", class_="notification--unread")
+        if not unread_cells:
+            log.error(f"{self.domain}: Error parsing HTML. This likely means that this is a heavily modified version of UNIT3D or that your cookies have expired.")
+            return []
+
         items: list[dict[str, Any]] = []
 
         for cell in unread_cells:
@@ -184,7 +185,7 @@ class UNIT3D(BaseTracker):
             if bodies:
                 return bodies[-1].get_text(separator="\n\n", strip=True)
         except Exception as e:
-            console.print(f"{self.domain}: [bold red]Failed to fetch body from {url}:[/bold red] {e}")
+            log.error(f"{self.domain}: Failed to fetch body from {url}:", exc_info=e)
 
         return ""
 
@@ -205,7 +206,7 @@ class UNIT3D(BaseTracker):
             resp = await self.client.post(item["url"], data=payload, headers=headers)
             return resp.is_success
         except Exception as e:
-            console.print(f"{self.domain}: [bold red]Exception marking as read:[/bold red] {e}")
+            log.error(f"{self.domain}: Exception marking as read:", exc_info=e)
             return False
 
     async def _fetch_items(self) -> list[dict[str, Any]]:
@@ -218,7 +219,8 @@ class UNIT3D(BaseTracker):
         all_items = notifs + msgs
 
         for item in all_items:
-            item["body"] = await self._fetch_body(item["url"])
+            if item["type"] == "message":
+                item["body"] = await self._fetch_body(item["url"])
 
         return all_items
 

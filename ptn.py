@@ -2,98 +2,21 @@
 
 import asyncio
 import glob
-import importlib
-import os
-import pkgutil
-import subprocess
+import sys
 from collections.abc import Coroutine
 from pathlib import Path
 from typing import Any, Callable
 
-import httpx
-from rich.console import Console
+from rich.progress import Progress
 
 from apps.discord import send_discord
 from apps.telegram import send_telegram
+from utils.check_version import check_version
+from utils.config_validator import load_config
+from utils.console import log
+from utils.tracker_loader import load_trackers
 
-console = Console()
-
-try:
-    import config as _imported_config
-except ImportError:
-    console.print("[yellow]config.py not found. Creating from example-config.py...[/yellow]")
-    console.print("[yellow]Please edit config.py with your settings before running again.[/yellow]")
-    import shutil
-
-    shutil.copyfile("example-config.py", "config.py")
-    exit(1)
-
-try:
-    user_config: dict[str, Any] = _imported_config.SETTINGS
-    api_tokens: dict[str, str] = _imported_config.API_TOKENS
-except Exception as e:
-    console.print(f"[bold red]Error loading config.py:[/bold red] {e}")
-    console.print("[bold red]Check example-config.py for any missing fields.[/bold red]")
-    exit(1)
-
-COOKIES_DIR = Path("./cookies")
-STATE_DIR = Path("./state")
-STATE_DIR.mkdir(exist_ok=True)
-COOKIES_DIR.mkdir(exist_ok=True)
-TELEGRAM_BOT_TOKEN = user_config.get("TELEGRAM_BOT_TOKEN")
-TELEGRAM_CHAT_ID = user_config.get("TELEGRAM_CHAT_ID")
-DISCORD_WEBHOOK_URL = user_config.get("DISCORD_WEBHOOK_URL")
-CHECK_INTERVAL = user_config.get("CHECK_INTERVAL", 900.0)
-MARK_AS_READ = user_config.get("MARK_AS_READ", False)
-
-
-async def check_version():
-    """Checks for new versions of the script on GitHub.s"""
-    try:
-        local_hash = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=True).stdout.strip()  # noqa: ASYNC221
-
-        async with httpx.AsyncClient() as client:
-            resp = await client.get("https://api.github.com/repos/wastaken7/PTNotifier/commits/main")
-            resp.raise_for_status()
-            remote_hash = resp.json()["sha"]
-
-        if local_hash != remote_hash:
-            console.print("[bold yellow]A new update is available on main branch.[/bold yellow]")
-            console.print("[bold green]Run 'git pull' to stay up to date.\n[/bold green]")
-
-    except Exception as e:
-        console.print(f"[bold red]Version check failed:[/] {e}")
-        console.print("Make sure git is installed and you have internet connectivity.")
-
-
-if (not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID) and not DISCORD_WEBHOOK_URL:
-    console.print("Error: [bold red]Please set TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID or DISCORD_WEBHOOK_URL in config.py[/bold red]")
-    exit(1)
-
-
-def load_trackers() -> dict[str, Any]:
-    """Dynamically loads all tracker classes from the 'trackers' directory."""
-    console.print("Loading trackers...")
-    trackers: dict[str, Any] = {}
-    tracker_modules = pkgutil.iter_modules([str(Path("trackers"))])
-    for tracker_info in tracker_modules:
-        if not tracker_info.ispkg:
-            try:
-                module_name = tracker_info.name
-                module = importlib.import_module(f"trackers.{module_name}")
-                tracker_class_name = f"{module_name}"
-                if hasattr(module, tracker_class_name):
-                    tracker_class = getattr(module, tracker_class_name)
-                    if hasattr(tracker_class, "fetch_notifications"):
-                        trackers[module_name] = tracker_class
-                    else:
-                        console.print(f"[bold red]Tracker class {tracker_class_name} does not have a fetch_notifications method.[/bold red]")
-                else:
-                    if module_name != "base":
-                        console.print(f"[bold red]Tracker module {module_name} does not have a class named {tracker_class_name}.[/bold red]")
-            except Exception as e:
-                console.print(f"[bold red]Failed to load tracker {tracker_info.name}:[/bold red] {e}")
-    return trackers
+user_config, api_tokens, discord_webhook_url, telegram_bot_token, telegram_chat_id = load_config()
 
 
 async def main():
@@ -103,67 +26,69 @@ async def main():
     await check_version()
     tracker_classes = load_trackers()
 
+    cookies_dir = Path("./cookies")
+
     notifiers: list[Callable[[dict[str, Any], str, str, str], Coroutine[Any, Any, None]]] = []
-    if TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID:
+    if telegram_bot_token and telegram_chat_id:
         notifiers.append(send_telegram)
-    if DISCORD_WEBHOOK_URL:
+    if discord_webhook_url:
         notifiers.append(send_discord)
 
     while True:
-        console.print("[bold blue]Checking trackers...[/bold blue]")
-        tasks: list[Any] = []
+        tasks: list[Coroutine[Any, Any, float]] = []
+
         for tracker_name, tracker_class in tracker_classes.items():
-            cookie_files = glob.glob(str(COOKIES_DIR / tracker_name.upper() / "*.txt"))
-            if not cookie_files:
-                cookie_files = glob.glob(str(COOKIES_DIR / tracker_name / "*.txt"))
+            search_patterns = [cookies_dir / tracker_name.upper() / "*.txt", cookies_dir / tracker_name / "*.txt", cookies_dir / "Other" / f"{tracker_name}.txt"]
 
-            for f in cookie_files:
-                tracker_instance = tracker_class(Path(f))
-                tasks.append(tracker_instance.fetch_notifications(notifiers))
+            seen_files: set[Path] = set()
+            for pattern in search_patterns:
+                for cookie_file in glob.glob(str(pattern)):
+                    path_obj = Path(cookie_file)
+                    if path_obj not in seen_files:
+                        tasks.append(tracker_class(path_obj).fetch_notifications(notifiers))
+                        seen_files.add(path_obj)
 
-        # Handle Other directory
-        other_cookie_files: list[str] = glob.glob(str(COOKIES_DIR / "Other" / "*.txt"))
-        for f in other_cookie_files:
-            cookie_path = Path(f)
-            tracker_name_from_file = cookie_path.stem
-            tracker_class = tracker_classes.get(tracker_name_from_file)
-            if tracker_class:
-                tracker_instance = tracker_class(cookie_path)
-                tasks.append(tracker_instance.fetch_notifications(notifiers))
-            else:
-                console.print(f"[bold red]No tracker class found for cookie file: {cookie_path.name}[/bold red]")
+        if not tasks:
+            log.warning("No tracker tasks found. Waiting 60s...")
+            await asyncio.sleep(60)
+            continue
 
-        sleep_time: float
-        if tasks:
-            try:
-                remaining_times = await asyncio.gather(*tasks, return_exceptions=True)
-                # Filter out exceptions and non-float values
-                valid_times: list[float] = [t for t in remaining_times if isinstance(t, (int, float)) and t > 0]
-                sleep_time = min(valid_times) if valid_times else 60
-            except Exception as e:
-                console.print(f"[bold red]An unexpected error occurred while gathering tracker tasks:[/bold red] {e}")
-                sleep_time = 60
-        else:
-            console.print("[yellow]No trackers loaded. Waiting...[/yellow]")
-            sleep_time = 60
+        results: list[float] = []
+        with Progress() as progress:
+            main_task = progress.add_task("[bold blue]Processing trackers...", total=len(tasks))
 
-        sleep_time_print = f"{sleep_time:.2f} seconds" if sleep_time <= 60 else f"{sleep_time / 60:.2f} minute{'s' if sleep_time / 60 != 1 else ''}"
+            for future in asyncio.as_completed(tasks):
+                try:
+                    result = await future
+                    if result and result > 0:
+                        results.append(result)
+                except Exception as e:  # noqa: PERF203
+                    log.error("Tracker execution failed:", exc_info=e)
+                finally:
+                    progress.update(main_task, advance=1)
 
-        console.print(f"[green]Waiting {sleep_time_print} before checking again...[/green]")
+        sleep_interval = min(results) if results else 60
+
+        time_str = f"{sleep_interval:.2f} seconds" if sleep_interval <= 60 else f"{sleep_interval / 60:.2f} minutes"
+
+        log.info(f"Cycle complete. Next check in {time_str}.")
+
         try:
-            await asyncio.sleep(sleep_time)
+            await asyncio.sleep(sleep_interval)
+        except asyncio.CancelledError:
+            log.info("Monitoring stopped by user.")
+            break
         except Exception as e:
-            console.print(f"[bold red]An unexpected error occurred during sleep:[/bold red] {e}")
-            await asyncio.sleep(sleep_time)
-        clear_terminal()
+            log.error(f"Unexpected error during sleep: {e}")
+            await asyncio.sleep(60)
 
-
-def clear_terminal():
-    os.system("cls" if os.name == "nt" else "clear")
+        # Clear the last two lines of the console
+        sys.stdout.write("\033[2A\033[J")
+        sys.stdout.flush()
 
 
 if __name__ == "__main__":
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        console.print("PTNotifier stopped by user.")
+        log.info("PTNotifier stopped by user.")

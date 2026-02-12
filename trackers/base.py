@@ -10,11 +10,10 @@ from pathlib import Path
 from typing import Any, Callable, Optional
 
 import httpx
-from rich.console import Console
 
 import config
-
-console = Console()
+from utils.console import log
+from utils.cookies import valid_response
 
 
 class BaseTracker(ABC):
@@ -31,12 +30,12 @@ class BaseTracker(ABC):
         tracker_name: str,
         base_url: str,
         custom_headers: Optional[dict[str, str]] = None,
-        scrape_interval: float = 1800.0,
+        scrape_interval: float = 1800,
     ):
         if custom_headers is None:
             custom_headers = {}
-        self.tracker = tracker_name
-        self.scrape_interval = scrape_interval
+        self.tracker = self.get_tracker_name(tracker_name)
+        self.scrape_interval = self.get_scrape_interval(scrape_interval)
         self.cookie_path = cookie_path
         self.filename = cookie_path.name
         self.cookie_jar = MozillaCookieJar(self.cookie_path)
@@ -47,8 +46,9 @@ class BaseTracker(ABC):
         try:
             self.cookie_jar.load(ignore_discard=True, ignore_expires=True)
         except Exception as e:
-            console.print(
-                f"{self.tracker}: Failed to load cookies from {self.filename}: {e}"
+            log.error(
+                f"{self.tracker}: Failed to load cookies from {self.filename}",
+                exc_info=e,
             )
 
         self.headers = {
@@ -66,6 +66,26 @@ class BaseTracker(ABC):
         )
         self.request_lock = asyncio.Lock()
 
+    def get_tracker_name(self, tracker_name: str) -> str:
+        """
+        Returns a clean tracker name from the provided string.
+        """
+        tracker_name = tracker_name.replace("https://", "").replace("http://", "")
+        if "." in tracker_name:
+            tracker_name = tracker_name.split(".")[0]
+            tracker_name = tracker_name.capitalize()
+        return tracker_name
+
+    def get_scrape_interval(self, scrape_interval: float) -> float:
+        """
+        Returns the scrape interval, ensuring it is not lower than the global setting.
+        """
+        config_interval = float(str(config.SETTINGS.get("SCRAPE_INTERVAL", 1800)))
+        if scrape_interval >= config_interval:
+            return scrape_interval
+        else:
+            return config_interval
+
     def _load_state(self) -> dict[str, Any]:
         if self.state_path.exists():
             try:
@@ -76,9 +96,7 @@ class BaseTracker(ABC):
             except Exception:
                 return {"processed_ids": [], "last_run": 0}
         else:
-            console.print(
-                f"{self.tracker}: [yellow]No existing state file found.[/yellow] There won't be any notifications on the first run to avoid spamming the Telegram API."
-            )
+            log.warning(f"{self.tracker}: No existing state file found. There won't be any notifications on the first run to avoid spamming.")
             self.first_run = True
             self.state = {"processed_ids": [], "last_run": 0}
             self._save_state()
@@ -89,7 +107,7 @@ class BaseTracker(ABC):
             self.state_path.parent.mkdir(parents=True, exist_ok=True)
             self.state_path.write_text(json.dumps(self.state, ensure_ascii=False, indent=2), "utf-8")
         except Exception as e:
-            console.print(f"{self.tracker}: [bold red]Error saving state:[/bold red] {e}")
+            log.error(f"{self.tracker}: Error saving state:", exc_info=e)
 
     async def _ack_item(self, item: dict[str, Any]) -> None:
         """Marks an item as processed."""
@@ -98,18 +116,18 @@ class BaseTracker(ABC):
             self.state["processed_ids"].append(item_id)
             if len(self.state["processed_ids"]) > 300:
                 self.state["processed_ids"] = self.state["processed_ids"][-300:]
-            self._save_state()
 
-    async def fetch_notifications(self, notifiers: list[Callable[[dict[str, Any], str, str, str], Coroutine[Any, Any, None]]]) -> float:
+    async def fetch_notifications(
+        self,
+        notifiers: list[Callable[[dict[str, Any], str, str, str], Coroutine[Any, Any, None]]],
+    ) -> float:
         if time.time() - self.state.get("last_run", 0) >= self.scrape_interval:
-            self.state["last_run"] = time.time()
-            self._save_state()
             await self.process(notifiers)
             return self.scrape_interval
         else:
             remaining_time = self.state.get("last_run", 0) + self.scrape_interval - time.time()
             if remaining_time > 0:
-                console.print(f"{self.tracker}: Skipping check, next run in {remaining_time / 60:.2f} minutes.")
+                log.debug(f"{self.tracker}: Skipping check, next run in {remaining_time / 60:.2f} minutes.")
             return remaining_time
 
     async def process(
@@ -131,9 +149,10 @@ class BaseTracker(ABC):
                         )
                         await asyncio.sleep(3)
                 await self._ack_item(item)
-
+            self.state["last_run"] = time.time()
+            self._save_state()
         except Exception as e:
-            console.print(f"{self.tracker}: [bold red]Error processing {self.base_url}:[/bold red] {e}")
+            log.error(f"{self.tracker}: Error processing {self.base_url}:", exc_info=e)
         finally:
             await self.client.aclose()
 
@@ -155,10 +174,19 @@ class BaseTracker(ABC):
                             if "." in domain:
                                 return domain
         except Exception as e:
-            console.print(f"[bold red]Error reading domain from {cookie_path.name}:[/bold red] {e}")
+            log.error(f"Error reading domain from {cookie_path.name}:", exc_info=e)
         return ""
 
-    async def _fetch_page(self, url: str, request_type: str) -> str:
+    async def _fetch_page(self, url: str, request_type: str, sucess_text: str = "") -> str:
+        """
+        Fetches a page with a global rate limit and optional validation.
+
+        :param url: The URL to fetch.
+        :param request_type: A descriptive name for the request (used for logging).
+        :param sucess_text: A keyword to look for in the response to verify a successful login/session.
+        :return: The response text or an empty string if the request fails.
+        :raises Exception: If an error occurs during the request.
+        """
         try:
             delay = float(str(config.SETTINGS.get("REQUEST_DELAY", 5.0)))
             timeout = float(str(config.SETTINGS.get("TIMEOUT", 30.0)))
@@ -176,13 +204,15 @@ class BaseTracker(ABC):
             BaseTracker._last_request_time = time.monotonic()
 
             try:
-                console.print(f"{self.tracker}: [blue]Checking for {request_type}...[/blue]")
+                log.debug(f"{self.tracker}: Checking for {request_type}...")
                 response = await self.client.get(url, timeout=timeout)
+                if sucess_text:
+                    valid_response(tracker=self.tracker, response=response.text, keyword=sucess_text)
                 response.raise_for_status()
                 return response.text
             except httpx.HTTPStatusError as e:
-                console.print(f"{self.tracker}: [bold red]HTTP error [/bold red]{e.response.status_code}")
+                log.error(f"{self.tracker}: HTTP error {e.response.status_code}")
             except Exception as e:
-                console.print(f"{self.tracker}: [bold red]Error: [/bold red]{e}")
+                log.error(f"{self.tracker}: Error:", exc_info=e)
 
         return ""

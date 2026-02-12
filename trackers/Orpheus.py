@@ -6,13 +6,9 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urljoin
 
-from rich.console import Console
-
 import config
 
-from .base import BaseTracker
-
-console = Console()
+from .base import BaseTracker, log
 
 
 class Orpheus(BaseTracker):
@@ -38,7 +34,7 @@ class Orpheus(BaseTracker):
     async def _fetch_items(self) -> list[dict[str, Any]]:
         """Fetch messages from Orpheus API."""
         if not self.api_token:
-            console.print(f"{self.tracker}: [yellow]API Token not found in config. Skipping...[/yellow]")
+            log.warning(f"{self.tracker}: API Token not found in config. Skipping...")
             return []
 
         return await self._fetch_mailbox()
@@ -46,12 +42,12 @@ class Orpheus(BaseTracker):
     async def _fetch_mailbox(self) -> list[dict[str, Any]]:
         """Parses the inbox AJAX response."""
         new_items: list[dict[str, Any]] = []
-        raw_data = await self._fetch_page(self.inbox_api, "messages")
+        raw_data = await self._fetch_page(self.inbox_api, "messages", sucess_text='"status":"success"')
 
         try:
             data = json.loads(raw_data)
         except Exception:
-            console.print(f"{self.tracker}: [bold red]Failed to parse inbox JSON.[/bold red]")
+            log.error(f"{self.tracker}: Failed to parse inbox JSON.", exc_info=True)
             return new_items
 
         if data.get("status") != "success":

@@ -7,11 +7,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urljoin
 
-from rich.console import Console
-
-from .base import BaseTracker
-
-console = Console()
+from .base import BaseTracker, log
 
 
 class DigitalCore(BaseTracker):
@@ -44,7 +40,7 @@ class DigitalCore(BaseTracker):
         try:
             data = json.loads(data)
         except Exception:
-            console.print(f"{self.tracker}: [bold red]Failed to parse mailbox JSON.[/bold red]")
+            log.error(f"{self.tracker}: Failed to parse mailbox JSON.", exc_info=True)
             return new_items
 
         if not data:
@@ -82,7 +78,7 @@ class DigitalCore(BaseTracker):
         try:
             data = json.loads(data)
         except Exception:
-            console.print(f"{self.tracker}: [bold red]Failed to parse notifications JSON.[/bold red]")
+            log.error(f"{self.tracker}: Failed to parse notifications JSON.", exc_info=True)
             return new_items
 
         if not data:

@@ -5,11 +5,8 @@ from typing import Any
 from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup
-from rich.console import Console
 
-from .base import BaseTracker
-
-console = Console()
+from .base import BaseTracker, log
 
 
 class HDSpace(BaseTracker):
@@ -41,7 +38,7 @@ class HDSpace(BaseTracker):
 
         target_url = self.state.get("notifications_url")
         if not target_url:
-            console.print(f"{self.tracker}: [bold red]Initialization failed.[/bold red]")
+            log.error(f"{self.tracker}: Initialization failed.")
             return []
 
         return await self._parse_messages(target_url)
@@ -49,7 +46,7 @@ class HDSpace(BaseTracker):
     async def _parse_messages(self, url: str) -> list[dict[str, Any]]:
         """Parses the XBTIT style message table for HD-Space and fetches their bodies."""
         new_items: list[dict[str, Any]] = []
-        response = await self._fetch_page(url, "messages")
+        response = await self._fetch_page(url, "messages", sucess_text="Favourites")
         soup = BeautifulSoup(response, "html.parser")
 
         form = soup.find("form", attrs={"name": "deleteall"}) if soup else None
@@ -121,6 +118,6 @@ class HDSpace(BaseTracker):
                                 break
 
             return body_content
-        except Exception as e:
-            console.print(f"{self.tracker}: [bold red]Failed to fetch body for {url}: {e}[/bold red]")
+        except Exception:
+            log.error(f"{self.tracker}: Failed to fetch body for {url}:", exc_info=True)
             return ""

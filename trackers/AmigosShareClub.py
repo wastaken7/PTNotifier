@@ -6,11 +6,8 @@ from urllib.parse import urljoin
 
 import httpx
 from bs4 import BeautifulSoup
-from rich.console import Console
 
-from .base import BaseTracker
-
-console = Console()
+from .base import BaseTracker, log
 
 
 class AmigosShareClub(BaseTracker):
@@ -74,16 +71,16 @@ class AmigosShareClub(BaseTracker):
             return f"Error: Received status code {response.status_code}"
 
         except httpx.RequestError as e:
-            console.print(f"[bold red]Network error fetching message body:[/bold red] {e}")
+            log.error("Network error fetching message body:", exc_info=e)
             return "Error retrieving content."
         except Exception as e:
-            console.print(f"[bold red]Unexpected error:[/bold red] {e}")
+            log.error("Unexpected error:", exc_info=e)
             return "Error retrieving content."
 
     async def _parse_messages(self, url: str) -> list[dict[str, Any]]:
         """Parses the inbox for ASC messages."""
         new_items: list[dict[str, Any]] = []
-        response = await self._fetch_page(url, "messages")
+        response = await self._fetch_page(url, "messages", sucess_text="Reputação")
         soup = BeautifulSoup(response, "html.parser")
 
         if not soup:

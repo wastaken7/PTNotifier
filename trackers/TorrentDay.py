@@ -5,11 +5,8 @@ from typing import Any
 from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup
-from rich.console import Console
 
-from .base import BaseTracker
-
-console = Console()
+from .base import BaseTracker, log
 
 
 class TorrentDay(BaseTracker):
@@ -33,7 +30,7 @@ class TorrentDay(BaseTracker):
     async def _parse_messages(self, url: str) -> list[dict[str, Any]]:
         """Parses the inbox for TorrentDay messages and filters unread ones."""
         new_items: list[dict[str, Any]] = []
-        response = await self._fetch_page(url, "messages")
+        response = await self._fetch_page(url, "messages", sucess_text="mybonus.php")
         soup = BeautifulSoup(response, "html.parser")
 
         if not soup:
@@ -101,6 +98,6 @@ class TorrentDay(BaseTracker):
                     return body_div.get_text(separator="\n\n", strip=True)
 
             return ""
-        except Exception as e:
-            console.print(f"{self.tracker}: [bold red]Failed to fetch body for {url}: {e}[/bold red]")
+        except Exception:
+            log.error(f"{self.tracker}: Failed to fetch body for {url}:", exc_info=True)
             return ""

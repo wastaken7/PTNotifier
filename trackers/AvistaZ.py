@@ -4,11 +4,8 @@ from pathlib import Path
 from typing import Any
 
 from bs4 import BeautifulSoup
-from rich.console import Console
 
-from .base import BaseTracker
-
-console = Console()
+from .base import BaseTracker, log
 
 
 class AvistaZ(BaseTracker):
@@ -90,7 +87,7 @@ class AvistaZ(BaseTracker):
 
     async def _fetch_and_parse_messages(self) -> list[dict[str, Any]]:
         new_items: list[dict[str, Any]] = []
-        response = await self._fetch_page(self.messages_url, "messages")
+        response = await self._fetch_page(self.messages_url, "messages", sucess_text="messenger/new")
         soup = BeautifulSoup(response, "html.parser")
         if not soup:
             return new_items
@@ -148,5 +145,5 @@ class AvistaZ(BaseTracker):
 
             return "No content found."
         except Exception as e:
-            console.print(f"[red]Error fetching message body from {url}: {e}[/red]")
+            log.error(f"Error fetching message body from {url}", exc_info=e)
             return "Error retrieving message body."
