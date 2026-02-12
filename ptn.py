@@ -82,13 +82,12 @@ async def main():
 
         sleep_time_print = f"{sleep_time:.2f} seconds" if sleep_time <= 60 else f"{sleep_time / 60:.2f} minute{'s' if sleep_time / 60 != 1 else ''}"
 
-        log.info(f"Waiting {sleep_time_print} before checking again...\n\n")
+        log.info(f"Checking again in {sleep_time_print}...")
         try:
             await asyncio.sleep(sleep_time)
         except Exception as e:
             log.error("An unexpected error occurred during sleep:", exc_info=e)
             await asyncio.sleep(sleep_time)
-        log.info("Checking again...\n")
 
 
 if __name__ == "__main__":

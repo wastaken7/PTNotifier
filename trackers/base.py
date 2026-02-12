@@ -72,7 +72,8 @@ class BaseTracker(ABC):
         tracker_name = tracker_name.replace("https://", "").replace("http://", "")
         if "." in tracker_name:
             tracker_name = tracker_name.split(".")[0]
-        return tracker_name.capitalize()
+            tracker_name = tracker_name.capitalize()
+        return tracker_name
 
     def get_scrape_interval(self, scrape_interval: float) -> float:
         """
