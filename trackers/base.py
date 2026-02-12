@@ -2,7 +2,6 @@
 
 import asyncio
 import json
-import logging
 import time
 from abc import ABC, abstractmethod
 from collections.abc import Coroutine
@@ -13,8 +12,7 @@ from typing import Any, Callable, Optional
 import httpx
 
 import config
-
-log = logging.getLogger("rich")
+from utils.console import log
 
 
 class BaseTracker(ABC):
