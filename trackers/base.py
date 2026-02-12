@@ -116,15 +116,12 @@ class BaseTracker(ABC):
             self.state["processed_ids"].append(item_id)
             if len(self.state["processed_ids"]) > 300:
                 self.state["processed_ids"] = self.state["processed_ids"][-300:]
-            self._save_state()
 
     async def fetch_notifications(
         self,
         notifiers: list[Callable[[dict[str, Any], str, str, str], Coroutine[Any, Any, None]]],
     ) -> float:
         if time.time() - self.state.get("last_run", 0) >= self.scrape_interval:
-            self.state["last_run"] = time.time()
-            self._save_state()
             await self.process(notifiers)
             return self.scrape_interval
         else:
@@ -152,7 +149,8 @@ class BaseTracker(ABC):
                         )
                         await asyncio.sleep(3)
                 await self._ack_item(item)
-
+            self.state["last_run"] = time.time()
+            self._save_state()
         except Exception as e:
             log.error(f"{self.tracker}: Error processing {self.base_url}:", exc_info=e)
         finally:
