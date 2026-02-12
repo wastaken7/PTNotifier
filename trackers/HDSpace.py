@@ -46,7 +46,7 @@ class HDSpace(BaseTracker):
     async def _parse_messages(self, url: str) -> list[dict[str, Any]]:
         """Parses the XBTIT style message table for HD-Space and fetches their bodies."""
         new_items: list[dict[str, Any]] = []
-        response = await self._fetch_page(url, "messages")
+        response = await self._fetch_page(url, "messages", sucess_text="index.php?page=usercp&uid=")
         soup = BeautifulSoup(response, "html.parser")
 
         form = soup.find("form", attrs={"name": "deleteall"}) if soup else None

@@ -30,7 +30,7 @@ class TorrentDay(BaseTracker):
     async def _parse_messages(self, url: str) -> list[dict[str, Any]]:
         """Parses the inbox for TorrentDay messages and filters unread ones."""
         new_items: list[dict[str, Any]] = []
-        response = await self._fetch_page(url, "messages")
+        response = await self._fetch_page(url, "messages", sucess_text="mybonus.php")
         soup = BeautifulSoup(response, "html.parser")
 
         if not soup:

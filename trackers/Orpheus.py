@@ -42,7 +42,7 @@ class Orpheus(BaseTracker):
     async def _fetch_mailbox(self) -> list[dict[str, Any]]:
         """Parses the inbox AJAX response."""
         new_items: list[dict[str, Any]] = []
-        raw_data = await self._fetch_page(self.inbox_api, "messages")
+        raw_data = await self._fetch_page(self.inbox_api, "messages", sucess_text='"status":"success"')
 
         try:
             data = json.loads(raw_data)

@@ -94,7 +94,7 @@ class UNIT3D(BaseTracker):
     ) -> list[dict[str, Any]]:
         if not url:
             return []
-        response = await self._fetch_page(url, request_type)
+        response = await self._fetch_page(url, request_type, sucess_text="general-settings")
         soup = BeautifulSoup(response, "html.parser")
         if soup:
             return parse_func(soup)

@@ -27,7 +27,7 @@ class Lajidui(BaseTracker):
 
     async def _parse_messages(self, url: str) -> list[dict[str, Any]]:
         new_items: list[dict[str, Any]] = []
-        response = await self._fetch_page(url, "messages")
+        response = await self._fetch_page(url, "messages", sucess_text="torrents.php")
         soup = BeautifulSoup(response, "html.parser")
 
         if not soup:

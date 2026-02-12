@@ -13,6 +13,7 @@ import httpx
 
 import config
 from utils.console import log
+from utils.cookies import valid_response
 
 
 class BaseTracker(ABC):
@@ -178,7 +179,16 @@ class BaseTracker(ABC):
             log.error(f"Error reading domain from {cookie_path.name}:", exc_info=e)
         return ""
 
-    async def _fetch_page(self, url: str, request_type: str) -> str:
+    async def _fetch_page(self, url: str, request_type: str, sucess_text: str = "") -> str:
+        """
+        Fetches a page with a global rate limit and optional validation.
+
+        :param url: The URL to fetch.
+        :param request_type: A descriptive name for the request (used for logging).
+        :param sucess_text: A keyword to look for in the response to verify a successful login/session.
+        :return: The response text or an empty string if the request fails.
+        :raises Exception: If an error occurs during the request.
+        """
         try:
             delay = float(str(config.SETTINGS.get("REQUEST_DELAY", 5.0)))
             timeout = float(str(config.SETTINGS.get("TIMEOUT", 30.0)))
@@ -198,6 +208,8 @@ class BaseTracker(ABC):
             try:
                 log.debug(f"{self.tracker}: Checking for {request_type}...")
                 response = await self.client.get(url, timeout=timeout)
+                if sucess_text:
+                    valid_response(tracker=self.tracker, response=response.text, keyword=sucess_text)
                 response.raise_for_status()
                 return response.text
             except httpx.HTTPStatusError as e:

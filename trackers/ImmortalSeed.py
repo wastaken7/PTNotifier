@@ -30,7 +30,7 @@ class ImmortalSeed(BaseTracker):
     async def _parse_messages(self, url: str) -> list[dict[str, Any]]:
         """Parses message rows for ImmortalSeed structure."""
         new_items: list[dict[str, Any]] = []
-        response = await self._fetch_page(url, "messages")
+        response = await self._fetch_page(url, "messages", sucess_text="browse.php")
         soup = BeautifulSoup(response, "html.parser")
 
         if not soup or not soup.find("form", attrs={"name": "messageform"}):

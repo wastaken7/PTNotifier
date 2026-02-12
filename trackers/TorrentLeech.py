@@ -47,7 +47,7 @@ class TorrentLeech(BaseTracker):
     async def _parse_notifications(self, url: str) -> list[dict[str, Any]]:
         """Parses the notifications table for TorrentLeech."""
         new_items: list[dict[str, Any]] = []
-        response = await self._fetch_page(url, "notifications")
+        response = await self._fetch_page(url, "notifications", sucess_text="snatchlist")
         soup = BeautifulSoup(response, "html.parser")
 
         if not soup:
