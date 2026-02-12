@@ -19,7 +19,7 @@ class March(BaseTracker):
             tracker_name="March",
             base_url="https://duckboobee.org/",
         )
-        self.inbox_url = urljoin(self.base_url, "messages.php")
+        self.inbox_url = urljoin(self.base_url, "messages.php?action=viewmailbox&box=1&unread=yes")
 
     async def _fetch_items(self) -> list[dict[str, Any]]:
         inbox_items = await self._parse_messages(self.inbox_url)
@@ -59,6 +59,7 @@ class March(BaseTracker):
 
             date_span = cells[3].find("span", title=True)
             date_str = date_span["title"] if date_span else cells[3].get_text(strip=True)
+            body = await self._fetch_body(link)
 
             new_items.append(
                 {
@@ -66,6 +67,7 @@ class March(BaseTracker):
                     "id": str(item_id),
                     "title": sender,
                     "subject": subject,
+                    "body": body,
                     "date": date_str,
                     "url": link,
                     "is_staff": False,
@@ -73,3 +75,21 @@ class March(BaseTracker):
             )
 
         return new_items
+
+    async def _fetch_body(self, url: str) -> str:
+        """Navigates to the message URL and extracts the content body."""
+        try:
+            response = await self._fetch_page(url, "message body")
+            soup = BeautifulSoup(response, "html.parser")
+
+            body_td = soup.find("td", attrs={"colspan": "2", "align": "left"})
+
+            if body_td:
+                parent_table = body_td.find_parent("table")
+                if parent_table and parent_table.get("width") == "737":
+                    return body_td.get_text(separator="\n\n", strip=True)
+
+            return ""
+        except Exception as e:
+            console.print(f"{self.tracker}: [bold red]Failed to fetch body for {url}: {e}[/bold red]")
+            return ""
