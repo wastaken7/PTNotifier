@@ -31,12 +31,12 @@ class BaseTracker(ABC):
         tracker_name: str,
         base_url: str,
         custom_headers: Optional[dict[str, str]] = None,
-        scrape_interval: float = 1800.0,
+        scrape_interval: float = 1800,
     ):
         if custom_headers is None:
             custom_headers = {}
-        self.tracker = tracker_name
-        self.scrape_interval = scrape_interval
+        self.tracker = self.get_tracker_name(tracker_name)
+        self.scrape_interval = self.get_scrape_interval(scrape_interval)
         self.cookie_path = cookie_path
         self.filename = cookie_path.name
         self.cookie_jar = MozillaCookieJar(self.cookie_path)
@@ -66,6 +66,25 @@ class BaseTracker(ABC):
             http2=True,
         )
         self.request_lock = asyncio.Lock()
+
+    def get_tracker_name(self, tracker_name: str) -> str:
+        """
+        Returns a clean tracker name from the provided string.
+        """
+        tracker_name = tracker_name.replace("https://", "").replace("http://", "")
+        if "." in tracker_name:
+            tracker_name = tracker_name.split(".")[0]
+        return tracker_name.capitalize()
+
+    def get_scrape_interval(self, scrape_interval: float) -> float:
+        """
+        Returns the scrape interval, ensuring it is not lower than the global setting.
+        """
+        config_interval = float(str(config.SETTINGS.get("SCRAPE_INTERVAL", 1800)))
+        if scrape_interval >= config_interval:
+            return scrape_interval
+        else:
+            return config_interval
 
     def _load_state(self) -> dict[str, Any]:
         if self.state_path.exists():
