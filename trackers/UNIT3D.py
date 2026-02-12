@@ -215,7 +215,8 @@ class UNIT3D(BaseTracker):
         all_items = notifs + msgs
 
         for item in all_items:
-            item["body"] = await self._fetch_body(item["url"])
+            if item["type"] == "message":
+                item["body"] = await self._fetch_body(item["url"])
 
         return all_items
 

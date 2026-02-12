@@ -2,6 +2,7 @@
 
 import asyncio
 import glob
+import sys
 from collections.abc import Coroutine
 from pathlib import Path
 from typing import Any, Callable
@@ -17,11 +18,6 @@ from utils.tracker_loader import load_trackers
 
 user_config, api_tokens, discord_webhook_url, telegram_bot_token, telegram_chat_id = load_config()
 
-COOKIES_DIR = Path("./cookies")
-STATE_DIR = Path("./state")
-STATE_DIR.mkdir(exist_ok=True)
-COOKIES_DIR.mkdir(exist_ok=True)
-
 
 async def main():
     """
@@ -30,64 +26,65 @@ async def main():
     await check_version()
     tracker_classes = load_trackers()
 
-    notifiers: list[Callable[[dict[str, Any], str, str, str], Coroutine[Any, Any, None]]] = []
+    cookies_dir = Path("./cookies")
 
+    notifiers: list[Callable[[dict[str, Any], str, str, str], Coroutine[Any, Any, None]]] = []
     if telegram_bot_token and telegram_chat_id:
         notifiers.append(send_telegram)
     if discord_webhook_url:
         notifiers.append(send_discord)
 
     while True:
-        tasks: list[Any] = []
+        tasks: list[Coroutine[Any, Any, float]] = []
+
         for tracker_name, tracker_class in tracker_classes.items():
-            cookie_files = glob.glob(str(COOKIES_DIR / tracker_name.upper() / "*.txt"))
-            if not cookie_files:
-                cookie_files = glob.glob(str(COOKIES_DIR / tracker_name / "*.txt"))
+            search_patterns = [cookies_dir / tracker_name.upper() / "*.txt", cookies_dir / tracker_name / "*.txt", cookies_dir / "Other" / f"{tracker_name}.txt"]
 
-            for f in cookie_files:
-                tracker_instance = tracker_class(Path(f))
-                tasks.append(tracker_instance.fetch_notifications(notifiers))
+            seen_files: set[Path] = set()
+            for pattern in search_patterns:
+                for cookie_file in glob.glob(str(pattern)):
+                    path_obj = Path(cookie_file)
+                    if path_obj not in seen_files:
+                        tasks.append(tracker_class(path_obj).fetch_notifications(notifiers))
+                        seen_files.add(path_obj)
 
-        # Handle Other directory
-        other_cookie_files: list[str] = glob.glob(str(COOKIES_DIR / "Other" / "*.txt"))
-        for f in other_cookie_files:
-            cookie_path = Path(f)
-            tracker_name_from_file = cookie_path.stem
-            tracker_class = tracker_classes.get(tracker_name_from_file)
-            if tracker_class:
-                tracker_instance = tracker_class(cookie_path)
-                tasks.append(tracker_instance.fetch_notifications(notifiers))
-            else:
-                log.error(f"No tracker class found for cookie file: {cookie_path.name}")
+        if not tasks:
+            log.warning("No tracker tasks found. Waiting 60s...")
+            await asyncio.sleep(60)
+            continue
 
-        sleep_time: float
-        if tasks:
-            with Progress() as progress:
-                task_id = progress.add_task("[bold blue]Processing...", total=len(tasks))
-                results: list[float] = []
-                for task in asyncio.as_completed(tasks):
-                    try:
-                        result = await task
+        results: list[float] = []
+        with Progress() as progress:
+            main_task = progress.add_task("[bold blue]Processing trackers...", total=len(tasks))
+
+            for future in asyncio.as_completed(tasks):
+                try:
+                    result = await future
+                    if result and result > 0:
                         results.append(result)
-                    except Exception as e:
-                        log.error("An error occurred while processing a tracker:", exc_info=e)
-                    progress.update(task_id, advance=1)
+                except Exception as e:  # noqa: PERF203
+                    log.error("Tracker execution failed:", exc_info=e)
+                finally:
+                    progress.update(main_task, advance=1)
 
-            # Filter out exceptions and non-float values
-            valid_times: list[float] = [t for t in results if t > 0]
-            sleep_time = min(valid_times) if valid_times else 60
-        else:
-            log.warning("No trackers loaded. Waiting...")
-            sleep_time = 60
+        sleep_interval = min(results) if results else 60
 
-        sleep_time_print = f"{sleep_time:.2f} seconds" if sleep_time <= 60 else f"{sleep_time / 60:.2f} minute{'s' if sleep_time / 60 != 1 else ''}"
+        time_str = f"{sleep_interval:.2f} seconds" if sleep_interval <= 60 else f"{sleep_interval / 60:.2f} minutes"
 
-        log.info(f"Checking again in {sleep_time_print}...")
+        log.info(f"Cycle complete. Next check in {time_str}.")
+
         try:
-            await asyncio.sleep(sleep_time)
+            await asyncio.sleep(sleep_interval)
+        except asyncio.CancelledError:
+            log.info("Monitoring stopped by user.")
+            break
         except Exception as e:
-            log.error("An unexpected error occurred during sleep:", exc_info=e)
-            await asyncio.sleep(sleep_time)
+            log.error(f"Unexpected error during sleep: {e}")
+            await asyncio.sleep(60)
+
+        # Clear the last two lines of the console
+        sys.stdout.write("\033[2A\033[J")
+        sys.stdout.flush()
 
 
 if __name__ == "__main__":

@@ -129,7 +129,7 @@ class BaseTracker(ABC):
         else:
             remaining_time = self.state.get("last_run", 0) + self.scrape_interval - time.time()
             if remaining_time > 0:
-                log.info(f"{self.tracker}: Skipping check, next run in {remaining_time / 60:.2f} minutes.")
+                log.debug(f"{self.tracker}: Skipping check, next run in {remaining_time / 60:.2f} minutes.")
             return remaining_time
 
     async def process(
@@ -196,7 +196,7 @@ class BaseTracker(ABC):
             BaseTracker._last_request_time = time.monotonic()
 
             try:
-                log.info(f"{self.tracker}: Checking for {request_type}...")
+                log.debug(f"{self.tracker}: Checking for {request_type}...")
                 response = await self.client.get(url, timeout=timeout)
                 response.raise_for_status()
                 return response.text

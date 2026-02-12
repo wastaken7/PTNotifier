@@ -1,4 +1,5 @@
 import logging
+import sys
 
 from rich.console import Console
 from rich.logging import RichHandler
@@ -6,15 +7,22 @@ from rich.logging import RichHandler
 console = Console()
 
 logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("h2").setLevel(logging.WARNING)
+logging.getLogger("hpache").setLevel(logging.WARNING)
 logging.getLogger("httpcore").setLevel(logging.WARNING)
+logging.getLogger("asyncio").setLevel(logging.WARNING)
+logging.getLogger("urllib3").setLevel(logging.WARNING)
+
 clean_handler = RichHandler(
     show_time=False,
     show_level=False,
     show_path=False,
     markup=True,
 )
+
+level_logging = logging.DEBUG if "-debug" in sys.argv or "--debug" in sys.argv else logging.INFO
 logging.basicConfig(
-    level=logging.INFO,
+    level=level_logging,
     format="%(message)s",
     handlers=[clean_handler],
 )
