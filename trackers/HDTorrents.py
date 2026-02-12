@@ -6,11 +6,8 @@ from typing import Any
 from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup
-from rich.console import Console
 
-from .base import BaseTracker
-
-console = Console()
+from .base import BaseTracker, log
 
 
 class HDTorrents(BaseTracker):
@@ -38,13 +35,12 @@ class HDTorrents(BaseTracker):
                     match = re.search(r'uid=(\d+)', href)
                     if match:
                         uid = match.group(1)
-                        print(uid)
                         inbox_path = f"usercp.php?uid={uid}&do=pm&action=list"
                         self.state["notifications_url"] = urljoin(self.base_url, inbox_path)
 
         target_url = self.state.get("notifications_url")
         if not target_url:
-            console.print(f"{self.tracker}: [bold red]Initialization failed (UID not found).[/bold red]")
+            log.error(f"{self.tracker}: Initialization failed (UID not found).")
             return []
 
         return await self._parse_messages(target_url)
@@ -121,6 +117,6 @@ class HDTorrents(BaseTracker):
                                 return body_cell.get_text(separator="\n\n", strip=True)
 
             return ""
-        except Exception as e:
-            console.print(f"{self.tracker}: [bold red]Failed to fetch body for {url}: {e}[/bold red]")
+        except Exception:
+            log.error(f"{self.tracker}: Failed to fetch body for {url}:", exc_info=True)
             return ""

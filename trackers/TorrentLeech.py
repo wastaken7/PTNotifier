@@ -6,11 +6,8 @@ from typing import Any
 from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup
-from rich.console import Console
 
-from .base import BaseTracker
-
-console = Console()
+from .base import BaseTracker, log
 
 
 class TorrentLeech(BaseTracker):
@@ -42,7 +39,7 @@ class TorrentLeech(BaseTracker):
 
         target_url = self.state.get("notifications_url")
         if not target_url:
-            console.print(f"{self.tracker}: [bold red]Initialization failed (Username not found).[/bold red]")
+            log.error(f"{self.tracker}: Initialization failed (Username not found).")
             return []
 
         return await self._parse_notifications(target_url)

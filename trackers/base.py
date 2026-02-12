@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import logging
 import time
 from abc import ABC, abstractmethod
 from collections.abc import Coroutine
@@ -10,11 +11,10 @@ from pathlib import Path
 from typing import Any, Callable, Optional
 
 import httpx
-from rich.console import Console
 
 import config
 
-console = Console()
+log = logging.getLogger("rich")
 
 
 class BaseTracker(ABC):
@@ -47,8 +47,9 @@ class BaseTracker(ABC):
         try:
             self.cookie_jar.load(ignore_discard=True, ignore_expires=True)
         except Exception as e:
-            console.print(
-                f"{self.tracker}: Failed to load cookies from {self.filename}: {e}"
+            log.error(
+                f"{self.tracker}: Failed to load cookies from {self.filename}",
+                exc_info=e,
             )
 
         self.headers = {
@@ -76,9 +77,7 @@ class BaseTracker(ABC):
             except Exception:
                 return {"processed_ids": [], "last_run": 0}
         else:
-            console.print(
-                f"{self.tracker}: [yellow]No existing state file found.[/yellow] There won't be any notifications on the first run to avoid spamming the Telegram API."
-            )
+            log.warning(f"{self.tracker}: No existing state file found. There won't be any notifications on the first run to avoid spamming.")
             self.first_run = True
             self.state = {"processed_ids": [], "last_run": 0}
             self._save_state()
@@ -89,7 +88,7 @@ class BaseTracker(ABC):
             self.state_path.parent.mkdir(parents=True, exist_ok=True)
             self.state_path.write_text(json.dumps(self.state, ensure_ascii=False, indent=2), "utf-8")
         except Exception as e:
-            console.print(f"{self.tracker}: [bold red]Error saving state:[/bold red] {e}")
+            log.error(f"{self.tracker}: Error saving state:", exc_info=e)
 
     async def _ack_item(self, item: dict[str, Any]) -> None:
         """Marks an item as processed."""
@@ -109,7 +108,7 @@ class BaseTracker(ABC):
         else:
             remaining_time = self.state.get("last_run", 0) + self.scrape_interval - time.time()
             if remaining_time > 0:
-                console.print(f"{self.tracker}: Skipping check, next run in {remaining_time / 60:.2f} minutes.")
+                log.info(f"{self.tracker}: Skipping check, next run in {remaining_time / 60:.2f} minutes.")
             return remaining_time
 
     async def process(
@@ -133,7 +132,7 @@ class BaseTracker(ABC):
                 await self._ack_item(item)
 
         except Exception as e:
-            console.print(f"{self.tracker}: [bold red]Error processing {self.base_url}:[/bold red] {e}")
+            log.error(f"{self.tracker}: Error processing {self.base_url}:", exc_info=e)
         finally:
             await self.client.aclose()
 
@@ -155,7 +154,7 @@ class BaseTracker(ABC):
                             if "." in domain:
                                 return domain
         except Exception as e:
-            console.print(f"[bold red]Error reading domain from {cookie_path.name}:[/bold red] {e}")
+            log.error(f"Error reading domain from {cookie_path.name}:", exc_info=e)
         return ""
 
     async def _fetch_page(self, url: str, request_type: str) -> str:
@@ -176,13 +175,13 @@ class BaseTracker(ABC):
             BaseTracker._last_request_time = time.monotonic()
 
             try:
-                console.print(f"{self.tracker}: [blue]Checking for {request_type}...[/blue]")
+                log.info(f"{self.tracker}: Checking for {request_type}...")
                 response = await self.client.get(url, timeout=timeout)
                 response.raise_for_status()
                 return response.text
             except httpx.HTTPStatusError as e:
-                console.print(f"{self.tracker}: [bold red]HTTP error [/bold red]{e.response.status_code}")
+                log.error(f"{self.tracker}: HTTP error {e.response.status_code}")
             except Exception as e:
-                console.print(f"{self.tracker}: [bold red]Error: [/bold red]{e}")
+                log.error(f"{self.tracker}: Error:", exc_info=e)
 
         return ""

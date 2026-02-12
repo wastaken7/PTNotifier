@@ -4,13 +4,10 @@ from pathlib import Path
 from typing import Any, Callable, Optional
 
 from bs4 import BeautifulSoup
-from rich.console import Console
 
 import config
 
-from .base import BaseTracker
-
-console = Console()
+from .base import BaseTracker, log
 
 
 class UNIT3D(BaseTracker):
@@ -43,7 +40,7 @@ class UNIT3D(BaseTracker):
 
     async def initialize(self):
         if not self.domain:
-            console.print(f"[bold red]Initialization failed: Could not determine domain from cookies.[/bold red]: {self.cookie_path}")
+            log.error(f"Initialization failed: Could not determine domain from cookies.: {self.cookie_path}")
             return
 
         if self.notifications_url:
@@ -57,7 +54,7 @@ class UNIT3D(BaseTracker):
         response = await self._fetch_page(self.base_url, "user ID")
         soup = BeautifulSoup(response, "html.parser")
         if not soup:
-            console.print(f"{self.domain}: [bold red]Initialization failed.[/bold red]")
+            log.error(f"{self.domain}: Initialization failed.")
             return
 
         token_tag = soup.find("meta", {"name": "csrf-token"})
@@ -184,7 +181,7 @@ class UNIT3D(BaseTracker):
             if bodies:
                 return bodies[-1].get_text(separator="\n\n", strip=True)
         except Exception as e:
-            console.print(f"{self.domain}: [bold red]Failed to fetch body from {url}:[/bold red] {e}")
+            log.error(f"{self.domain}: Failed to fetch body from {url}:", exc_info=e)
 
         return ""
 
@@ -205,7 +202,7 @@ class UNIT3D(BaseTracker):
             resp = await self.client.post(item["url"], data=payload, headers=headers)
             return resp.is_success
         except Exception as e:
-            console.print(f"{self.domain}: [bold red]Exception marking as read:[/bold red] {e}")
+            log.error(f"{self.domain}: Exception marking as read:", exc_info=e)
             return False
 
     async def _fetch_items(self) -> list[dict[str, Any]]:

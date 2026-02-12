@@ -6,11 +6,9 @@ import aiofiles
 import httpx
 from anyio import Path
 from PIL import Image
-from rich.console import Console
 
 import config
-
-console = Console()
+from trackers.base import log
 
 
 async def get_local_favicon(client: httpx.AsyncClient, icon_url: str, tracker_name: str) -> tuple[Optional[Path], str]:
@@ -44,7 +42,7 @@ async def get_local_favicon(client: httpx.AsyncClient, icon_url: str, tracker_na
 
             return icon_path, icon_filename
     except Exception as e:
-        console.print(f"[yellow]Warning: Could not download or convert icon from {icon_url}: {e}[/yellow]")
+        log.warning(f"Warning: Could not download or convert icon from {icon_url}", exc_info=e)
 
     return None, icon_filename
 
@@ -60,7 +58,7 @@ async def send_discord(
     """
     webhook_url: str = config.SETTINGS.get("DISCORD_WEBHOOK_URL", "")
     if not webhook_url:
-        console.print("[bold red]DISCORD_WEBHOOK_URL not set in config.py.[/bold red]")
+        log.error("DISCORD_WEBHOOK_URL not set in config.py.")
         return
 
     icon_url = item.get("favicon", f"{base_url}/favicon.ico")
@@ -119,7 +117,7 @@ async def send_discord(
 
             resp.raise_for_status()
         except Exception as e:
-            console.print(f"[bold red]Discord Exception[/bold red]: {e}")
+            log.error("Discord Exception:", exc_info=e)
 
 def format_for_discord(raw_description: str):
     """

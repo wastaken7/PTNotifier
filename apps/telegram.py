@@ -2,11 +2,9 @@ import re
 from typing import Any
 
 import httpx
-from rich.console import Console
 
 import config
-
-console = Console()
+from trackers.base import log
 
 
 async def send_telegram(
@@ -22,7 +20,7 @@ async def send_telegram(
     telegram_chat_id: str = config.SETTINGS.get("TELEGRAM_CHAT_ID", "")
     telegram_topic_id: str = config.SETTINGS.get("TELEGRAM_TOPIC_ID", "")
     if not telegram_bot_token or not telegram_chat_id:
-        console.print("[bold red]TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID not set in config.py.[/bold red]")
+        log.error("TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID not set in config.py.")
         return
 
     icon = "🔔" if item["type"] == "notification" else "📩"
@@ -70,9 +68,9 @@ async def send_telegram(
             resp = await tg_client.post(url, json=payload)
             resp.raise_for_status()
             if not resp.is_success:
-                console.print(f"[bold red]Telegram Error[/bold red]: {resp.text}")
+                log.error(f"Telegram Error: {resp.text}")
         except Exception as e:
-            console.print(f"[bold red]Telegram Exception[/bold red]: {e}")
+            log.error("Telegram Exception:", exc_info=e)
 
 def format_for_telegram(text: str) -> str:
     """

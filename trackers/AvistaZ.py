@@ -4,11 +4,8 @@ from pathlib import Path
 from typing import Any
 
 from bs4 import BeautifulSoup
-from rich.console import Console
 
-from .base import BaseTracker
-
-console = Console()
+from .base import BaseTracker, log
 
 
 class AvistaZ(BaseTracker):
@@ -148,5 +145,5 @@ class AvistaZ(BaseTracker):
 
             return "No content found."
         except Exception as e:
-            console.print(f"[red]Error fetching message body from {url}: {e}[/red]")
+            log.error(f"Error fetching message body from {url}", exc_info=e)
             return "Error retrieving message body."

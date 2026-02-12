@@ -6,11 +6,8 @@ from typing import Any
 from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup
-from rich.console import Console
 
-from .base import BaseTracker
-
-console = Console()
+from .base import BaseTracker, log
 
 
 class ImmortalSeed(BaseTracker):
@@ -115,6 +112,6 @@ class ImmortalSeed(BaseTracker):
                     return body_text
 
             return ""
-        except Exception as e:
-            console.print(f"{self.tracker}: [bold red]Failed to fetch body for {url}: {e}[/bold red]")
+        except Exception:
+            log.error(f"{self.tracker}: Failed to fetch body for {url}:", exc_info=True)
             return ""
