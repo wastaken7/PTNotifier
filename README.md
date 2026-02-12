@@ -30,8 +30,11 @@ For these types, the name of the cookie file does not matter, as long as it is a
 ### Other Trackers
 These are specific trackers that have their own dedicated module. The cookie file **must be placed in the `cookies/Other/` directory** and **must have a specific name** that matches the tracker's module.
 
+### Supported Trackers List
 | Module | Website URL | Required Cookie Filename | Observation |
 | :--- | :--- | :--- | :--- |
+| `UNIT3D.py` | ? | anything | All UNIT3D trackers (in theory), if the tracker is highly customized, it is likely that it will not work. If you do not know whether a tracker is UNIT3D, check its code base [here](https://hdvinnie.github.io/Private-Trackers-Spreadsheet/). |
+| AvistaZ Network | ? | anything | This includes AvistaZ, CinemaZ, PrivateHD, ExoticaZ.|
 | `AmigosShareClub.py` | `cliente.amigos-share.club`| `AmigosShareClub.txt` | - |
 | `Anthelion.py` | `anthelion.me` | `Anthelion.txt` | - |
 | `BJShare.py` | `bj-share.info`| `BJShare.txt` | - |
