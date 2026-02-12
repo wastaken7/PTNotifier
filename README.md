@@ -30,8 +30,11 @@ For these types, the name of the cookie file does not matter, as long as it is a
 ### Other Trackers
 These are specific trackers that have their own dedicated module. The cookie file **must be placed in the `cookies/Other/` directory** and **must have a specific name** that matches the tracker's module.
 
+### Supported Trackers List
 | Module | Website URL | Required Cookie Filename | Observation |
 | :--- | :--- | :--- | :--- |
+| `UNIT3D.py` | - | - | All UNIT3D trackers (in theory), if the tracker is highly customized, it is likely that it will not work. If you do not know whether a tracker is UNIT3D, check it's code base [here](https://hdvinnie.github.io/Private-Trackers-Spreadsheet/). |
+| `AvistaZ.py` | - | - | This includes AvistaZ, CinemaZ, PrivateHD, ExoticaZ.|
 | `AmigosShareClub.py` | `cliente.amigos-share.club`| `AmigosShareClub.txt` | - |
 | `Anthelion.py` | `anthelion.me` | `Anthelion.txt` | - |
 | `BJShare.py` | `bj-share.info`| `BJShare.txt` | - |
@@ -46,11 +49,11 @@ These are specific trackers that have their own dedicated module. The cookie fil
 | `Lajidui.py` | `pt.lajidui.top`| `Lajidui.txt` | - |
 | `March.py` | `duckboobee.org`| `March.txt` | - |
 | `Orpheus.py` | `orpheus.network`| `Orpheus.txt` | It is necessary to add an API key in config.py |
-| `PTFans.py` | `ptfans.cc`| `PTFans.txt` | - |
+| `PTFans.py` | `ptfans.cc`| `PTFans.txt` | No longer maintained, support is provided as-is. |
 | `PTSKit.py` | `ptskit.org`| `PTSKit.txt` | - |
 | `SceneTime.py` | `scenetime.com`| `SceneTime.txt` | - |
 | `TorrentDay.py` | `torrentday.com`| `TorrentDay.txt` | - |
-| `TorrentLeech.py` | `torrentleech.org`| `TorrentLeech.txt` | - |
+| `TorrentLeech.py` | `torrentleech.org`| `TorrentLeech.txt` | Currently only supports site notifications, not private messages. |
 
 ## Setup
 

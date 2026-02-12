@@ -53,6 +53,9 @@ class HDCiTY(BaseTracker):
             subject_tag = row.find("a", class_="altlink")
             subject = subject_tag.get_text(strip=True) if subject_tag else "No Subject"
 
+            body_tag = row.find("div", style=lambda x: bool(x and "border:#89a 1px dashed;margin:6px;padding:6px;" in x))
+            body = body_tag.get_text(strip=True) if body_tag else ""
+
             cells = row.find_all("td", class_="rowfollow")
             sender = "System"
             date_str = "Unknown"
@@ -69,6 +72,7 @@ class HDCiTY(BaseTracker):
                     "id": item_id,
                     "title": sender,
                     "subject": subject,
+                    "body": body,
                     "date": date_str,
                     "url": link,
                     "is_staff": False,

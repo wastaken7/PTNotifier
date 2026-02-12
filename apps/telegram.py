@@ -1,3 +1,4 @@
+import re
 from typing import Any
 
 import httpx
@@ -43,7 +44,8 @@ async def send_telegram(
         content += f"<b>Subject:</b> {item['subject']}\n\n"
 
     if item.get("body"):
-        content += f"<b>Body:</b> {item['body']}\n\n"
+        clean_body = format_for_telegram(item.get("body", ""))
+        content += f"<b>Body:</b> {clean_body}\n\n"
 
     footer = item["date"]
 
@@ -71,3 +73,23 @@ async def send_telegram(
                 console.print(f"[bold red]Telegram Error[/bold red]: {resp.text}")
         except Exception as e:
             console.print(f"[bold red]Telegram Exception[/bold red]: {e}")
+
+def format_for_telegram(text: str) -> str:
+    """
+    Converts BBCode and generic HTML to Telegram-compatible HTML.
+    """
+    # 1. Normalize BBCode to HTML
+    text = re.sub(r"\[b\](.*?)\[/b\]", r"<b>\1</b>", text, flags=re.IGNORECASE)
+    text = re.sub(r"\[i\](.*?)\[/i\]", r"<i>\1</i>", text, flags=re.IGNORECASE)
+    text = re.sub(r"\[u\](.*?)\[/u\]", r"<u>\1</u>", text, flags=re.IGNORECASE)
+    text = re.sub(r"\[s\](.*?)\[/s\]", r"<s>\1</s>", text, flags=re.IGNORECASE)
+    text = re.sub(r"\[spoiler\](.*?)\[/spoiler\]", r"<tg-spoiler>\1</tg-spoiler>", text, flags=re.IGNORECASE)
+    text = re.sub(r"\[url=(.*?)\](.*?)\[/url\]", r'<a href="\1">\2</a>', text, flags=re.IGNORECASE)
+    text = re.sub(r"\[code\](.*?)\[/code\]", r"<code>\1</code>", text, flags=re.IGNORECASE)
+
+    # 2. Convert specific HTML tags to Telegram's unique tags
+    text = re.sub(r"<spoiler>(.*?)</spoiler>", r"<tg-spoiler>\1</tg-spoiler>", text, flags=re.IGNORECASE)
+    text = re.sub(r"<strike>(.*?)</strike>", r"<s>\1</s>", text, flags=re.IGNORECASE)
+
+    # 3. Final cleaning: Telegram HTML is strict, but usually accepts <b>, <i>, <u>, <s>, <a> and <code>
+    return text

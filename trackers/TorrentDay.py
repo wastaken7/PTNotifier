@@ -31,7 +31,7 @@ class TorrentDay(BaseTracker):
         return inbox_items
 
     async def _parse_messages(self, url: str) -> list[dict[str, Any]]:
-        """Parses the inbox for TorrentDay messages."""
+        """Parses the inbox for TorrentDay messages and filters unread ones."""
         new_items: list[dict[str, Any]] = []
         response = await self._fetch_page(url, "messages")
         soup = BeautifulSoup(response, "html.parser")
@@ -50,34 +50,57 @@ class TorrentDay(BaseTracker):
             if len(cells) < 3:
                 continue
 
+            status_img = cells[0].find("img", src=lambda s: bool(s and "unreadMsg.png" in s))
+            if not status_img:
+                continue
+
+            sender_link = cells[0].find("a")
+            sender = sender_link.get_text(strip=True) if sender_link else "System"
+
             subject_link = cells[1].find("a")
             if not subject_link:
                 continue
 
             subject = subject_link.get_text(strip=True)
             relative_url = subject_link.get("href")
-
             if not isinstance(relative_url, str):
                 continue
 
             item_id = relative_url.split("/")[-1].split("#")[0]
 
-            if item_id in self.state["processed_ids"]:
-                continue
-
             date_str = cells[2].get_text(strip=True)
-            link = urljoin(self.base_url, relative_url)
+            full_link = urljoin(self.base_url, relative_url)
+
+            body = await self._fetch_body(full_link)
 
             new_items.append(
                 {
                     "type": "message",
                     "id": item_id,
-                    "title": "Unknown",
+                    "title": sender,
                     "subject": subject,
+                    "body": body,
                     "date": date_str,
-                    "url": link,
-                    "is_staff": False,
+                    "url": full_link,
+                    "is_staff": sender.lower() == "system",
                 }
             )
 
         return new_items
+
+    async def _fetch_body(self, url: str) -> str:
+        """Navigates to the conversation and extracts the last message body."""
+        try:
+            response = await self._fetch_page(url, "message body")
+            soup = BeautifulSoup(response, "html.parser")
+            message_containers = soup.find_all("div", class_="postContainer")
+            if message_containers:
+                last_container = message_containers[-1]
+                body_div = last_container.find("div", class_="postContents")
+                if body_div:
+                    return body_div.get_text(separator="\n\n", strip=True)
+
+            return ""
+        except Exception as e:
+            console.print(f"{self.tracker}: [bold red]Failed to fetch body for {url}: {e}[/bold red]")
+            return ""

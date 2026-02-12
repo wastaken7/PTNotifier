@@ -22,7 +22,7 @@ class Lajidui(BaseTracker):
             tracker_name="Lajidui",
             base_url="https://pt.lajidui.top/",
         )
-        self.inbox_url = urljoin(self.base_url, "messages.php")
+        self.inbox_url = urljoin(self.base_url, "messages.php?action=viewmailbox&box=1&unread=yes")
 
     async def _fetch_items(self) -> list[dict[str, Any]]:
         inbox_items = await self._parse_messages(self.inbox_url)
@@ -73,6 +73,7 @@ class Lajidui(BaseTracker):
 
             date_span = cells[3].find("span", title=True)
             date_str = date_span["title"] if date_span else cells[3].get_text(strip=True)
+            body = await self._fetch_body(msg_url)
 
             new_items.append(
                 {
@@ -80,6 +81,7 @@ class Lajidui(BaseTracker):
                     "id": item_id,
                     "title": sender,
                     "subject": subject,
+                    "body": body,
                     "date": date_str,
                     "url": msg_url,
                     "is_staff": False,
@@ -87,3 +89,20 @@ class Lajidui(BaseTracker):
             )
 
         return new_items
+
+    async def _fetch_body(self, url: str) -> str:
+        """Navigates to the message URL and extracts the content body."""
+        try:
+            response = await self._fetch_page(url, "message body")
+            soup = BeautifulSoup(response, "html.parser")
+            all_tds = soup.find_all("td", attrs={"colspan": "2", "align": "left"})
+
+            for td in all_tds:
+                parent_table = td.find_parent("table")
+                if parent_table and parent_table.get("width") == "737":
+                    return td.get_text(separator="\n\n", strip=True)
+
+            return ""
+        except Exception as e:
+            console.print(f"{self.tracker}: [bold red]Failed to fetch body for {url}: {e}[/bold red]")
+            return ""

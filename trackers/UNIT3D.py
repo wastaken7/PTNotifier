@@ -160,9 +160,6 @@ class UNIT3D(BaseTracker):
                 msg_url = msg_url[0]
             msg_id = f"msg_{str(msg_url).rstrip('/').split('/')[-1]}"
 
-            if msg_id in self.state["processed_ids"]:
-                continue
-
             items.append(
                 {
                     "type": "message",
@@ -174,6 +171,22 @@ class UNIT3D(BaseTracker):
                 }
             )
         return items
+
+    async def _fetch_body(self, url: str) -> str:
+        """
+        Fetches the content of the last message/comment from a specific page.
+        """
+        try:
+            response = await self._fetch_page(url, "item body")
+            soup = BeautifulSoup(response, "html.parser")
+
+            bodies = soup.find_all("div", class_="panel__body bbcode-rendered")
+            if bodies:
+                return bodies[-1].get_text(separator="\n\n", strip=True)
+        except Exception as e:
+            console.print(f"{self.domain}: [bold red]Failed to fetch body from {url}:[/bold red] {e}")
+
+        return ""
 
     async def _mark_as_read(self, item: dict[str, Any]) -> bool:
         if item["type"] == "message":
@@ -196,11 +209,18 @@ class UNIT3D(BaseTracker):
             return False
 
     async def _fetch_items(self) -> list[dict[str, Any]]:
-        """Fetch all new items from the tracker."""
+        """Fetch all new items from the tracker and populate their bodies."""
         await self.initialize()
+
         notifs = await self._fetch_and_parse(self.notifications_url, self._parse_notifications_html, "notifications")
         msgs = await self._fetch_and_parse(self.messages_url, self._parse_messages_html, "messages")
-        return notifs + msgs
+
+        all_items = notifs + msgs
+
+        for item in all_items:
+            item["body"] = await self._fetch_body(item["url"])
+
+        return all_items
 
     async def _ack_item(self, item: dict[str, Any]) -> None:
         """Marks an item as processed and read on the site."""

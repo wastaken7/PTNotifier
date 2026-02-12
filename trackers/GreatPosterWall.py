@@ -23,7 +23,7 @@ class GreatPosterWall(BaseTracker):
             tracker_name="GreatPosterWall",
             base_url="https://greatposterwall.com/",
         )
-        self.inbox_url = urljoin(self.base_url, "inbox.php")
+        self.inbox_url = urljoin(self.base_url, "inbox.php?sort=unread")
         self.staff_url = urljoin(self.base_url, "staffpm.php")
 
     async def _fetch_items(self) -> list[dict[str, Any]]:
@@ -33,7 +33,7 @@ class GreatPosterWall(BaseTracker):
         return inbox_items + staff_items
 
     async def _parse_messages(self, url: str, is_staff: bool) -> list[dict[str, Any]]:
-        """Parses all message tables for both Inbox and Staff PMs."""
+        """Parses the message table and fetches bodies for unread conversations."""
         new_items: list[dict[str, Any]] = []
         message_type = "messages" if not is_staff else "staff messages"
         response = await self._fetch_page(url, message_type)
@@ -56,30 +56,68 @@ class GreatPosterWall(BaseTracker):
                 if not subject_cell:
                     continue
 
+                is_unread = bool(cols[1].find("strong"))
+                if not is_unread:
+                    continue
+
                 subject = subject_cell.get_text(strip=True)
                 href = subject_cell.get("href", "")
                 link = urljoin(self.base_url, str(href))
-                item_id = link.split("id=")[-1] if "id=" in link else link
 
-                if item_id in self.state["processed_ids"]:
-                    continue
+                messages = await self._fetch_body(link, subject, is_staff)
+                new_items.extend(messages)
 
-                if is_staff:
-                    sender = "Staff System"
-                    date_str = cols[3].get_text(strip=True) if len(cols) > 3 else cols[2].get_text(strip=True)
-                else:
-                    sender = cols[2].get_text(strip=True) if len(cols) > 2 else "System"
-                    date_str = cols[3].get_text(strip=True) if len(cols) > 3 else "Unknown"
-
-                new_items.append(
-                    {
-                        "type": "message",
-                        "id": item_id,
-                        "title": sender,
-                        "subject": subject,
-                        "date": date_str,
-                        "url": link,
-                        "is_staff": is_staff,
-                    }
-                )
         return new_items
+
+    async def _fetch_body(self, url: str, subject: str, is_staff: bool) -> list[dict[str, Any]]:
+        """
+        Fetches the conversation page and extracts individual messages.
+        """
+        messages_found: list[dict[str, Any]] = []
+        response = await self._fetch_page(url, "message body")
+        soup = BeautifulSoup(response, "html.parser")
+        if not soup:
+            return messages_found
+
+        containers = soup.find_all("div", class_="Box")
+
+        for box in containers:
+            body_div = box.find("div", id=lambda x: bool(x and x.startswith("message")))
+            if not body_div:
+                continue
+
+            raw_id = body_div.get("id", "")
+            message_id = str(raw_id).replace("message", "") if raw_id else None
+
+            if not message_id or message_id in self.state["processed_ids"]:
+                continue
+
+            header = box.find("div", class_="Box-header")
+            sender = "System"
+            date_str = "Unknown"
+
+            if header:
+                sender_link = header.find("a", href=lambda x: bool(x and "user.php?id=" in x))
+                if sender_link:
+                    sender = sender_link.get_text(strip=True)
+
+                date_span = header.find("span", class_="tooltipstered")
+                if date_span:
+                    date_str = date_span.get_text(strip=True)
+
+            body_text = body_div.get_text("\n\n", strip=True)
+
+            messages_found.append(
+                {
+                    "type": "message",
+                    "id": message_id,
+                    "sender": sender,
+                    "subject": subject,
+                    "body": body_text,
+                    "date": date_str,
+                    "url": f"{url}#message{message_id}",
+                    "is_staff": is_staff,
+                }
+            )
+
+        return messages_found

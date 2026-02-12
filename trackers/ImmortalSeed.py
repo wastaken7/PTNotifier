@@ -76,13 +76,14 @@ class ImmortalSeed(BaseTracker):
                 sender_link = sender_div.find("a")
                 if sender_link:
                     sender = sender_link.get_text(strip=True)
-
+            body = await self._fetch_body(link)
             new_items.append(
                 {
                     "type": "message",
                     "id": item_id,
                     "title": sender,
                     "subject": subject,
+                    "body": body,
                     "date": date_str,
                     "url": link,
                     "is_staff": False,
@@ -90,3 +91,30 @@ class ImmortalSeed(BaseTracker):
             )
 
         return new_items
+
+    async def _fetch_body(self, url: str) -> str:
+        """Navigates to the message URL and extracts the content body."""
+        try:
+            response = await self._fetch_page(url, "message body")
+            soup = BeautifulSoup(response, "html.parser")
+
+            hr_tag = soup.find("hr", attrs={"size": "1"})
+            if hr_tag:
+                parent_td = hr_tag.find_parent("td")
+                if parent_td:
+                    buttons_div = parent_td.find("div")
+                    if buttons_div:
+                        buttons_div.decompose()
+
+                    body_text = parent_td.get_text(separator="\n\n", strip=True)
+                    strong_tag = parent_td.find("strong")
+                    if strong_tag:
+                        subject_header = strong_tag.get_text(strip=True)
+                        body_text = body_text.replace(subject_header, "", 1).strip()
+
+                    return body_text
+
+            return ""
+        except Exception as e:
+            console.print(f"{self.tracker}: [bold red]Failed to fetch body for {url}: {e}[/bold red]")
+            return ""

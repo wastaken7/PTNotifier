@@ -23,7 +23,7 @@ class Anthelion(BaseTracker):
             tracker_name="Anthelion",
             base_url="https://anthelion.me/",
         )
-        self.inbox_url = urljoin(self.base_url, "inbox.php")
+        self.inbox_url = urljoin(self.base_url, "inbox.php?sort=unread")
         self.staff_url = urljoin(self.base_url, "staffpm.php")
 
     async def _fetch_items(self) -> list[dict[str, Any]]:
@@ -33,7 +33,7 @@ class Anthelion(BaseTracker):
         return inbox_items + staff_items
 
     async def _parse_messages(self, url: str, is_staff: bool) -> list[dict[str, Any]]:
-        """Parses all message tables for both Inbox and Staff PMs."""
+        """Parses the message table and fetches bodies for unread conversations."""
         new_items: list[dict[str, Any]] = []
         message_type = "messages" if not is_staff else "staff messages"
         response = await self._fetch_page(url, message_type)
@@ -46,7 +46,7 @@ class Anthelion(BaseTracker):
             return new_items
 
         for table in tables:
-            rows = table.find_all("tr", class_="row")
+            rows = table.find_all("tr", class_="unreadpm")
             for row in rows:
                 cols = row.find_all("td")
                 if len(cols) < 3:
@@ -60,27 +60,66 @@ class Anthelion(BaseTracker):
                 href = subject_cell.get("href", "")
                 link = urljoin(self.base_url, str(href))
 
-                item_id = link.split("id=")[-1] if "id=" in link else link
+                messages = await self._fetch_body(link, subject, is_staff)
+                new_items.extend(messages)
 
-                if item_id in self.state["processed_ids"]:
-                    continue
-
-                if is_staff:
-                    sender = "Staff System"
-                    date_str = cols[2].get_text(strip=True)
-                else:
-                    sender = cols[2].get_text(strip=True) if len(cols) > 2 else "System"
-                    date_str = cols[3].get_text(strip=True) if len(cols) > 3 else "Unknown"
-
-                new_items.append(
-                    {
-                        "type": "message",
-                        "id": item_id,
-                        "sender": sender,
-                        "subject": subject,
-                        "date": date_str,
-                        "url": link,
-                        "is_staff": is_staff,
-                    }
-                )
         return new_items
+
+    async def _fetch_body(self, url: str, subject: str, is_staff: bool) -> list[dict[str, Any]]:
+        """
+        Fetches the conversation page and extracts individual messages.
+        Each message is treated as a unique item based on its internal ID.
+        """
+        messages_found: list[dict[str, Any]] = []
+        response = await self._fetch_page(url, "message body")
+        soup = BeautifulSoup(response, "html.parser")
+        if not soup:
+            return messages_found
+
+        containers = soup.find_all("div", class_="box vertical_space")
+
+        for box in containers:
+            message_id = None
+            body_div = box.find("div", class_="body")
+
+            if is_staff:
+                raw_id = box.get("id", "")
+                message_id = str(raw_id).replace("post", "") if raw_id else None
+            elif body_div:
+                raw_id = body_div.get("id", "")
+                message_id = str(raw_id).replace("message", "") if raw_id else None
+
+            if not message_id or message_id in self.state["processed_ids"]:
+                continue
+
+            head = box.find("div", class_="head")
+            sender = "System"
+            if head:
+                sender_link = head.find("a", href=True)
+                if sender_link:
+                    sender = sender_link.get_text(strip=True)
+
+            date_str = "Unknown"
+            if head:
+                date_span = head.find("span", class_="time")
+                if date_span:
+                    date_str = date_span.get_text(strip=True)
+
+            body_text = "No content"
+            if body_div:
+                body_text = body_div.get_text("\n\n", strip=True)
+
+            messages_found.append(
+                {
+                    "type": "message",
+                    "id": message_id,
+                    "sender": sender,
+                    "subject": subject,
+                    "body": body_text,
+                    "date": date_str,
+                    "url": f"{url}#post{message_id}" if is_staff else f"{url}#message{message_id}",
+                    "is_staff": is_staff,
+                }
+            )
+
+        return messages_found
