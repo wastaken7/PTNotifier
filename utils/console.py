@@ -1,8 +1,10 @@
 import logging
+import random
 import sys
 
 from rich.console import Console
 from rich.logging import RichHandler
+from rich.text import Text
 
 console = Console()
 
@@ -28,13 +30,45 @@ logging.basicConfig(
 )
 log = logging.getLogger("rich")
 
-ASCII_ART = r"""
-[#00f0ff]  ____    ______  __  __          __           ___						 [/#00f0ff]
-[#22c8ff] /\  _ \ /\__  _\/\ \/\ \        /\ \__  __  / ___\ __					 [/#22c8ff]
-[#44a0ff] \ \ \_\ \/_/\ \/\ \ `\\ \    ___\ \  _\/\_\/\ \__//\_\     __   _ __	 [/#44a0ff]
-[#6678ff]  \ \  __/  \ \ \ \ \   ` \  / __`\ \ \/\/\ \ \  __\/\ \  /'__`\/\`'__\ [/#6678ff]
-[#8850ff]   \ \ \/    \ \ \ \ \ \`\ \/\ \_\ \ \ \_\ \ \ \ \_/\ \ \/\  __/\ \ \/	 [/#8850ff]
-[#aa28ff]    \ \_\     \ \_\ \ \_\ \_\ \____/\ \__\\ \_\ \_\  \ \_\ \____\\ \_\	 [/#aa28ff]
-[#cc00ff]     \/_/      \/_/  \/_/\/_/\/___/  \/__/ \/_/\/_/   \/_/\/____/ \/_/	 [/#cc00ff]
-"""
-console.print(ASCII_ART)
+ascii_lines = [
+    " ███████████  ███████████ ██████   █████           █████     ███     ██████   ███",
+    "░░███░░░░░███░█░░░███░░░█░░██████ ░░███           ░░███     ░░░     ███░░███ ░░░",
+    " ░███    ░███░   ░███  ░  ░███░███ ░███   ██████  ███████   ████   ░███ ░░░  ████   ██████  ████████",
+    " ░██████████     ░███     ░███░░███░███  ███░░███░░░███░   ░░███  ███████   ░░███  ███░░███░░███░░███",
+    " ░███░░░░░░      ░███     ░███ ░░██████ ░███ ░███  ░███     ░███ ░░░███░     ░███ ░███████  ░███ ░░░",
+    " ░███            ░███     ░███  ░░█████ ░███ ░███  ░███ ███ ░███   ░███      ░███ ░███░░░   ░███",
+    " █████           █████    █████  ░░█████░░██████   ░░█████  █████  █████     █████░░██████  █████",
+    "░░░░░           ░░░░░    ░░░░░    ░░░░░  ░░░░░░     ░░░░░  ░░░░░  ░░░░░     ░░░░░  ░░░░░░  ░░░░░",
+]
+
+
+def get_random_rgb():
+    """Generates a random RGB tuple."""
+    return (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
+
+
+color_start = get_random_rgb()
+color_end = get_random_rgb()
+
+
+def interpolate_color(c1: tuple[int, int, int], c2: tuple[int, int, int], factor: float):
+    """Calculates a color between c1 and c2 based on the factor (0.0 to 1.0)."""
+    r = int(c1[0] + (c2[0] - c1[0]) * factor)
+    g = int(c1[1] + (c2[1] - c1[1]) * factor)
+    b = int(c1[2] + (c2[2] - c1[2]) * factor)
+    return f"rgb({r},{g},{b})"
+
+
+for line in ascii_lines:
+    text = Text()
+    line_length = len(line)
+
+    for i, char in enumerate(line):
+        if char in "█░":
+            factor = i / line_length if line_length > 1 else 0
+            current_color = interpolate_color(color_start, color_end, factor)
+            text.append(char, style=current_color)
+        else:
+            text.append(char)
+
+    console.print(text, soft_wrap=True)
