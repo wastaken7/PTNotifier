@@ -34,6 +34,18 @@ logging.basicConfig(
     handlers=[clean_handler],
 )
 log = logging.getLogger("rich")
+
+ASCII_ART = r"""
+[#00f0ff]  ____    ______  __  __          __           ___						 [/#00f0ff]
+[#22c8ff] /\  _ \ /\__  _\/\ \/\ \        /\ \__  __  / ___\ __					 [/#22c8ff]
+[#44a0ff] \ \ \_\ \/_/\ \/\ \ `\\ \    ___\ \  _\/\_\/\ \__//\_\     __   _ __	 [/#44a0ff]
+[#6678ff]  \ \  __/  \ \ \ \ \   ` \  / __`\ \ \/\/\ \ \  __\/\ \  /'__`\/\`'__\ [/#6678ff]
+[#8850ff]   \ \ \/    \ \ \ \ \ \`\ \/\ \_\ \ \ \_\ \ \ \ \_/\ \ \/\  __/\ \ \/	 [/#8850ff]
+[#aa28ff]    \ \_\     \ \_\ \ \_\ \_\ \____/\ \__\\ \_\ \_\  \ \_\ \____\\ \_\	 [/#aa28ff]
+[#cc00ff]     \/_/      \/_/  \/_/\/_/\/___/  \/__/ \/_/\/_/   \/_/\/____/ \/_/	 [/#cc00ff]
+"""
+console.print(ASCII_ART)
+
 try:
     import config as _imported_config
 except ImportError:
@@ -155,8 +167,8 @@ async def main():
         sleep_time: float
         if tasks:
             with Progress() as progress:
-                task_id = progress.add_task("[bold blue]Checking trackers...", total=len(tasks))
-                results: list[Any] = []
+                task_id = progress.add_task("[bold blue]Processing...", total=len(tasks))
+                results: list[float] = []
                 for task in asyncio.as_completed(tasks):
                     try:
                         result = await task
@@ -166,7 +178,7 @@ async def main():
                     progress.update(task_id, advance=1)
 
             # Filter out exceptions and non-float values
-            valid_times: list[float] = [t for t in results if isinstance(t, (int, float)) and t > 0]
+            valid_times: list[float] = [t for t in results if t > 0]
             sleep_time = min(valid_times) if valid_times else 60
         else:
             log.warning("No trackers loaded. Waiting...")
@@ -174,12 +186,13 @@ async def main():
 
         sleep_time_print = f"{sleep_time:.2f} seconds" if sleep_time <= 60 else f"{sleep_time / 60:.2f} minute{'s' if sleep_time / 60 != 1 else ''}"
 
-        log.info(f"Waiting {sleep_time_print} before checking again...")
+        log.info(f"Waiting {sleep_time_print} before checking again...\n\n")
         try:
-            await asyncio.sleep(sleep_time)
+            await asyncio.sleep(5)
         except Exception as e:
             log.error("An unexpected error occurred during sleep:", exc_info=e)
             await asyncio.sleep(sleep_time)
+        log.info("Checking again...\n")
 
 
 if __name__ == "__main__":

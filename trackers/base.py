@@ -99,7 +99,10 @@ class BaseTracker(ABC):
                 self.state["processed_ids"] = self.state["processed_ids"][-300:]
             self._save_state()
 
-    async def fetch_notifications(self, notifiers: list[Callable[[dict[str, Any], str, str, str], Coroutine[Any, Any, None]]]) -> float:
+    async def fetch_notifications(
+        self,
+        notifiers: list[Callable[[dict[str, Any], str, str, str], Coroutine[Any, Any, None]]],
+    ) -> float:
         if time.time() - self.state.get("last_run", 0) >= self.scrape_interval:
             self.state["last_run"] = time.time()
             self._save_state()

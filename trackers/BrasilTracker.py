@@ -7,7 +7,7 @@ from urllib.parse import urljoin
 from bs4 import BeautifulSoup
 from rich.console import Console
 
-from .base import BaseTracker, log
+from .base import BaseTracker
 
 console = Console()
 
@@ -25,7 +25,6 @@ class BrasilTracker(BaseTracker):
         )
         self.inbox_url = urljoin(self.base_url, "inbox.php?sort=unread")
         self.staff_url = urljoin(self.base_url, "staffpm.php")
-        log.info(f"{self.tracker}: Inbox URL: {self.inbox_url}")
 
     async def _fetch_items(self) -> list[dict[str, Any]]:
         """Fetch standard and staff messages from Brasil Tracker."""
