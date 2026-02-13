@@ -36,11 +36,14 @@ class DigitalCore(BaseTracker):
         """Parses the mailbox API response."""
         new_items: list[dict[str, Any]] = []
         data = await self._fetch_page(self.mailbox_api, "messages")
+        if not data:
+            return new_items
 
         try:
             data = json.loads(data)
         except Exception:
-            log.error(f"{self.tracker}: Failed to parse mailbox JSON.", exc_info=True)
+            log.error(f"{self.tracker}: Failed to parse inbox JSON.")
+            log.debug(f"{self.tracker}: Raw data: {data}", exc_info=True)
             return new_items
 
         if not data:
