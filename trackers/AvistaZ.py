@@ -87,7 +87,7 @@ class AvistaZ(BaseTracker):
 
     async def _fetch_and_parse_messages(self) -> list[dict[str, Any]]:
         new_items: list[dict[str, Any]] = []
-        response = await self._fetch_page(self.messages_url, "messages", sucess_text="messenger/new")
+        response = await self._fetch_page(self.messages_url, "messages", success_text="messenger/new")
         soup = BeautifulSoup(response, "html.parser")
         if not soup:
             return new_items

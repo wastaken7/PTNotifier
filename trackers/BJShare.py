@@ -37,7 +37,7 @@ class BJShare(BaseTracker):
         """Parses unread message rows and triggers body fetching."""
         new_items: list[dict[str, Any]] = []
         message_type = "messages" if not is_staff else "staff messages"
-        response = await self._fetch_page(url, message_type, sucess_text="forums.php")
+        response = await self._fetch_page(url, message_type, success_text="forums.php")
         soup = BeautifulSoup(response, "html.parser")
         if not soup:
             return new_items

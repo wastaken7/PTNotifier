@@ -42,7 +42,7 @@ class Orpheus(BaseTracker):
     async def _fetch_mailbox(self) -> list[dict[str, Any]]:
         """Parses the inbox AJAX response."""
         new_items: list[dict[str, Any]] = []
-        raw_data = await self._fetch_page(self.inbox_api, "messages", sucess_text='"status":"success"')
+        raw_data = await self._fetch_page(self.inbox_api, "messages", success_text='"status":"success"')
 
         try:
             data = json.loads(raw_data)
@@ -56,29 +56,33 @@ class Orpheus(BaseTracker):
         messages = data.get("response", {}).get("messages", [])
 
         for msg in messages:
-            conv_id = str(msg.get("convId"))
-            if not conv_id or conv_id in self.state["processed_ids"]:
+            try:
+                conv_id = str(msg.get("convId"))
+                if not conv_id or conv_id in self.state["processed_ids"]:
+                    continue
+
+                body = await self._fetch_conversation_body(conv_id)
+
+                sender = msg.get("username", "System")
+                subject = msg.get("subject", "No Subject")
+                link = urljoin(self.base_url, f"inbox.php?action=viewconv&id={conv_id}")
+
+                clean_body = re.sub(r"<[^>]*>", "", body).strip()
+
+                new_items.append(
+                    {
+                        "type": "message",
+                        "id": conv_id,
+                        "sender": sender,
+                        "subject": subject,
+                        "body": clean_body,
+                        "date": msg.get("date", ""),
+                        "url": link,
+                    }
+                )
+            except Exception:
+                log.error(f"{self.tracker}: Failed to process message: {msg}", exc_info=True)
                 continue
-
-            body = await self._fetch_conversation_body(conv_id)
-
-            sender = msg.get("username", "System")
-            subject = msg.get("subject", "No Subject")
-            link = urljoin(self.base_url, f"inbox.php?action=viewconv&id={conv_id}")
-
-            clean_body = re.sub(r"<[^>]*>", "", body).strip()
-
-            new_items.append(
-                {
-                    "type": "message",
-                    "id": conv_id,
-                    "sender": sender,
-                    "subject": subject,
-                    "body": clean_body,
-                    "date": msg.get("date", ""),
-                    "url": link,
-                }
-            )
         return new_items
 
     async def _fetch_conversation_body(self, conv_id: str) -> str:

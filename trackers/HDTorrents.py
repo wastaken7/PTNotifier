@@ -48,7 +48,7 @@ class HDTorrents(BaseTracker):
     async def _parse_messages(self, url: str) -> list[dict[str, Any]]:
         """Parses the message table for HD-Torrents."""
         new_items: list[dict[str, Any]] = []
-        response = await self._fetch_page(url, "messages", sucess_text="wishlist.php")
+        response = await self._fetch_page(url, "messages", success_text="wishlist.php")
         soup = BeautifulSoup(response, "html.parser")
 
         form = soup.find("form", attrs={"name": "deleteall"}) if soup else None

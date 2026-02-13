@@ -177,20 +177,31 @@ class BaseTracker(ABC):
             log.error(f"Error reading domain from {cookie_path.name}:", exc_info=e)
         return ""
 
-    async def _fetch_page(self, url: str, request_type: str, sucess_text: str = "") -> str:
+    async def _fetch_page(
+        self,
+        url: str,
+        request_type: str,
+        success_text: str = "",
+    ) -> str:
         """
         Fetches a page with a global rate limit and optional validation.
 
         :param url: The URL to fetch.
         :param request_type: A descriptive name for the request (used for logging).
-        :param sucess_text: A keyword to look for in the response to verify a successful login/session.
-        :return: The response text or an empty string if the request fails.
-        :raises Exception: If an error occurs during the request.
+        :param success_text: A keyword to look for in the response to verify a successful login/session.
+        :return: The response text.
+        :raises RequestError: If the request fails or validation fails.
+        :raises ValueError: If inputs are invalid.
         """
         try:
-            delay = float(str(config.SETTINGS.get("REQUEST_DELAY", 5.0)))
-            timeout = float(str(config.SETTINGS.get("TIMEOUT", 30.0)))
-        except (ValueError, TypeError):
+            delay = float(config.SETTINGS.get("REQUEST_DELAY", 5.0))
+            timeout = float(config.SETTINGS.get("TIMEOUT", 30.0))
+
+            if delay < 0 or timeout < 0:
+                raise ValueError("Delay and timeout must be positive")
+
+        except (ValueError, TypeError) as e:
+            log.warning(f"Invalid config values, using defaults: {e}")
             delay, timeout = 5.0, 30.0
 
         async with BaseTracker._request_lock:
@@ -199,20 +210,38 @@ class BaseTracker(ABC):
 
             if elapsed < delay:
                 sleep_time = delay - elapsed
+                log.debug(f"{self.tracker}: Rate limiting - sleeping {sleep_time:.2f}s")
                 await asyncio.sleep(sleep_time)
 
-            BaseTracker._last_request_time = time.monotonic()
+        try:
+            log.debug(f"{self.tracker}: Fetching {request_type} from {url}")
+            response = await self.client.get(url, timeout=timeout)
+            response.raise_for_status()
 
-            try:
-                log.debug(f"{self.tracker}: Checking for {request_type}...")
-                response = await self.client.get(url, timeout=timeout)
-                if sucess_text:
-                    valid_response(tracker=self.tracker, response=response.text, keyword=sucess_text)
-                response.raise_for_status()
-                return response.text
-            except httpx.HTTPStatusError as e:
-                log.error(f"{self.tracker}: HTTP error {e.response.status_code}")
-            except Exception as e:
-                log.error(f"{self.tracker}: Error:", exc_info=e)
+            if success_text:
+                valid_response(self.tracker, response.text, success_text)
+
+            async with BaseTracker._request_lock:
+                BaseTracker._last_request_time = time.monotonic()
+
+            log.debug(f"{self.tracker}: Successfully fetched {request_type}")
+            return response.text
+
+        except httpx.HTTPStatusError as e:
+            error_msg = f"{self.tracker}: HTTP {e.response.status_code} error for {request_type}"
+            log.error(error_msg)
+
+        except httpx.TimeoutException:
+            error_msg = f"{self.tracker}: Timeout fetching {request_type}"
+            log.error(error_msg)
+
+        except httpx.RequestError as e:
+            error_msg = f"{self.tracker}: Network error fetching {request_type}: {e}"
+            log.error(error_msg)
+
+        except Exception:
+            error_msg = f"{self.tracker}: Unexpected error fetching {request_type}"
+            log.error(error_msg, exc_info=True)
 
         return ""
+

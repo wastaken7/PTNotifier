@@ -29,7 +29,7 @@ class IPTorrents(BaseTracker):
     async def _parse_messages(self, url: str) -> list[dict[str, Any]]:
         """Parses the message list structure from IPTorrents HTML."""
         new_items: list[dict[str, Any]] = []
-        response = await self._fetch_page(url, "messages", sucess_text="settings.php")
+        response = await self._fetch_page(url, "messages", success_text="settings.php")
         soup = BeautifulSoup(response, "html.parser")
 
         if not soup:
