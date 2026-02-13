@@ -5,7 +5,9 @@ from typing import Any
 
 from bs4 import BeautifulSoup
 
-from .base import BaseTracker, log
+from utils.console import log
+
+from .base import BaseTracker
 
 
 class AvistaZ(BaseTracker):

@@ -5,12 +5,10 @@ import glob
 import sys
 from collections.abc import Coroutine
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from rich.progress import Progress
 
-from apps.discord import send_discord
-from apps.telegram import send_telegram
 from utils.check_version import check_version
 from utils.config_validator import load_config
 from utils.console import log
@@ -25,14 +23,7 @@ async def main():
     """
     await check_version()
     tracker_classes = load_trackers()
-
     cookies_dir = Path("./cookies")
-
-    notifiers: list[Callable[[dict[str, Any], str, str, str], Coroutine[Any, Any, None]]] = []
-    if telegram_bot_token and telegram_chat_id:
-        notifiers.append(send_telegram)
-    if discord_webhook_url:
-        notifiers.append(send_discord)
 
     while True:
         tasks: list[Coroutine[Any, Any, float]] = []
@@ -45,7 +36,7 @@ async def main():
                 for cookie_file in glob.glob(str(pattern)):
                     path_obj = Path(cookie_file)
                     if path_obj not in seen_files:
-                        tasks.append(tracker_class(path_obj).fetch_notifications(notifiers))
+                        tasks.append(tracker_class(path_obj).fetch_notifications())
                         seen_files.add(path_obj)
 
         if not tasks:

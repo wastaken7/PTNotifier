@@ -7,7 +7,9 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urljoin
 
-from .base import BaseTracker, log
+from utils.console import log
+
+from .base import BaseTracker
 
 
 class DigitalCore(BaseTracker):

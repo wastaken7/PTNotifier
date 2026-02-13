@@ -6,8 +6,9 @@ from typing import Any, Callable, Optional
 from bs4 import BeautifulSoup
 
 import config
+from utils.console import log
 
-from .base import BaseTracker, log
+from .base import BaseTracker
 
 
 class UNIT3D(BaseTracker):

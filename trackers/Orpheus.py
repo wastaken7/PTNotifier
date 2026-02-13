@@ -7,8 +7,9 @@ from typing import Any
 from urllib.parse import urljoin
 
 import config
+from utils.console import log
 
-from .base import BaseTracker, log
+from .base import BaseTracker
 
 
 class Orpheus(BaseTracker):

@@ -6,7 +6,9 @@ from urllib.parse import parse_qs, urljoin, urlparse
 
 from bs4 import BeautifulSoup
 
-from .base import BaseTracker, log
+from utils.console import log
+
+from .base import BaseTracker
 
 
 class PTSKit(BaseTracker):
