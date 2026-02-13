@@ -182,7 +182,8 @@ class UNIT3D(BaseTracker):
             if bodies:
                 return bodies[-1].get_text(separator="\n\n", strip=True)
         except Exception as e:
-            log.error(f"{self.domain}: Failed to fetch body from {url}:", exc_info=e)
+            log.error(f"{self.domain}: Failed to fetch body from {url}: {e}")
+            log.debug(f"{self.domain}: Network error details", exc_info=True)
 
         return ""
 

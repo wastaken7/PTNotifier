@@ -118,6 +118,7 @@ class HDSpace(BaseTracker):
                                 break
 
             return body_content
-        except Exception:
-            log.error(f"{self.tracker}: Failed to fetch body for {url}:", exc_info=True)
+        except Exception as e:
+            log.error(f"{self.tracker}: Failed to fetch body for {url}: {e}")
+            log.debug("Network error details", exc_info=True)
             return ""

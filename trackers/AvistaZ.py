@@ -145,5 +145,6 @@ class AvistaZ(BaseTracker):
 
             return "No content found."
         except Exception as e:
-            log.error(f"Error fetching message body from {url}", exc_info=e)
+            log.error(f"Error fetching message body from {url}: {e}")
+            log.debug("Error details", exc_info=True)
             return "Error retrieving message body."

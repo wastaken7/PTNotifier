@@ -107,6 +107,7 @@ class IPTorrents(BaseTracker):
                                 if body_el:
                                     return body_el.get_text(separator="\n\n", strip=True)
             return ""
-        except Exception:
-            log.error(f"{self.tracker}: API Error for {item_id}:", exc_info=True)
+        except Exception as e:
+            log.error(f"{self.tracker}: API Error for {item_id}: {e}")
+            log.debug(f"{self.tracker}: Network error details", exc_info=True)
             return ""

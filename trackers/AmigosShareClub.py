@@ -71,10 +71,12 @@ class AmigosShareClub(BaseTracker):
             return f"Error: Received status code {response.status_code}"
 
         except httpx.RequestError as e:
-            log.error("Network error fetching message body:", exc_info=e)
+            log.error(f"Network error fetching message body: {e}")
+            log.debug("Network error details", exc_info=True)
             return "Error retrieving content."
         except Exception as e:
-            log.error("Unexpected error:", exc_info=e)
+            log.error(f"Unexpected error: {e}")
+            log.debug("Unexpected error details", exc_info=True)
             return "Error retrieving content."
 
     async def _parse_messages(self, url: str) -> list[dict[str, Any]]:

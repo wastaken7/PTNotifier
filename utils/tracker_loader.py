@@ -27,5 +27,7 @@ def load_trackers() -> dict[str, Any]:
                     if module_name != "base":
                         log.error(f"Tracker module {module_name} does not have a class named {tracker_class_name}.")
             except Exception as e:
-                log.error(f"Failed to load tracker {tracker_info.name}:", exc_info=e)
+                log.error(f"Failed to load tracker {tracker_info.name}: {e}")
+                log.debug("Tracker load error details", exc_info=True)
+
     return trackers

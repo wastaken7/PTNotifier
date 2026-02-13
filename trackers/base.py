@@ -46,10 +46,8 @@ class BaseTracker(ABC):
         try:
             self.cookie_jar.load(ignore_discard=True, ignore_expires=True)
         except Exception as e:
-            log.error(
-                f"{self.tracker}: Failed to load cookies from {self.filename}",
-                exc_info=e,
-            )
+            log.error(f"{self.tracker}: Failed to load cookies from {self.filename}: {e}")
+            log.debug("Cookie error details", exc_info=True)
 
         self.headers = {
             "User-Agent": "PTNotifier 1.0 (https://github.com/wastaken7/PTNotifier)",
@@ -107,7 +105,8 @@ class BaseTracker(ABC):
             self.state_path.parent.mkdir(parents=True, exist_ok=True)
             self.state_path.write_text(json.dumps(self.state, ensure_ascii=False, indent=2), "utf-8")
         except Exception as e:
-            log.error(f"{self.tracker}: Error saving state:", exc_info=e)
+            log.error(f"{self.tracker}: Error saving state: {e}")
+            log.debug("State error details", exc_info=True)
 
     async def _ack_item(self, item: dict[str, Any]) -> None:
         """Marks an item as processed."""
@@ -152,7 +151,8 @@ class BaseTracker(ABC):
             self.state["last_run"] = time.time()
             self._save_state()
         except Exception as e:
-            log.error(f"{self.tracker}: Error processing {self.base_url}:", exc_info=e)
+            log.error(f"{self.tracker}: Error processing {self.base_url}: {e}")
+            log.debug("Processing error details", exc_info=True)
         finally:
             await self.client.aclose()
 
@@ -174,7 +174,8 @@ class BaseTracker(ABC):
                             if "." in domain:
                                 return domain
         except Exception as e:
-            log.error(f"Error reading domain from {cookie_path.name}:", exc_info=e)
+            log.error(f"Error reading domain from {cookie_path.name}: {e}")
+            log.debug("Cookie error details", exc_info=True)
         return ""
 
     async def _fetch_page(
@@ -241,7 +242,8 @@ class BaseTracker(ABC):
 
         except Exception:
             error_msg = f"{self.tracker}: Unexpected error fetching {request_type}"
-            log.error(error_msg, exc_info=True)
+            log.error(error_msg)
+            log.debug("Error details", exc_info=True)
 
         return ""
 

@@ -22,7 +22,8 @@ def load_config() -> tuple[dict[str, Any], dict[str, str], str | None, str | Non
         discord_webhook_url = user_config.get("DISCORD_WEBHOOK_URL")
 
     except Exception as e:
-        log.error("Error loading config.py:", exc_info=e)
+        log.error(f"Error loading config.py: {e}")
+        log.debug("Config error details", exc_info=True)
         log.error("Check example-config.py for any missing fields.")
         exit(1)
 

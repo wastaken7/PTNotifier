@@ -42,7 +42,8 @@ async def get_local_favicon(client: httpx.AsyncClient, icon_url: str, tracker_na
 
             return icon_path, icon_filename
     except Exception as e:
-        log.warning(f"Warning: Could not download or convert icon from {icon_url}", exc_info=e)
+        log.warning(f"Warning: Could not download or convert icon from {icon_url}: {e}")
+        log.debug("Icon error details", exc_info=True)
 
     return None, icon_filename
 
@@ -117,7 +118,9 @@ async def send_discord(
 
             resp.raise_for_status()
         except Exception as e:
-            log.error("Discord Exception:", exc_info=e)
+            log.error(f"Discord Exception: {e}")
+            log.debug("Discord error details", exc_info=True)
+
 
 def format_for_discord(raw_description: str):
     """

@@ -117,6 +117,7 @@ class HDTorrents(BaseTracker):
                                 return body_cell.get_text(separator="\n\n", strip=True)
 
             return ""
-        except Exception:
-            log.error(f"{self.tracker}: Failed to fetch body for {url}:", exc_info=True)
+        except Exception as e:
+            log.error(f"{self.tracker}: Failed to fetch body for {url}: {e}")
+            log.debug("Network error details", exc_info=True)
             return ""

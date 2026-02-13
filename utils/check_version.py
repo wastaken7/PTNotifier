@@ -61,5 +61,6 @@ async def check_version():
         else:
             log.error(f"GitHub API error: {e}")
     except Exception as e:
-        log.error("Version check failed:", exc_info=e)
+        log.error(f"Version check failed: {e}")
+        log.debug("Version check error details", exc_info=True)
         log.warning("Ensure you have an active internet connection.")

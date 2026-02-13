@@ -87,6 +87,7 @@ class March(BaseTracker):
                     return body_td.get_text(separator="\n\n", strip=True)
 
             return ""
-        except Exception:
-            log.error(f"{self.tracker}: Failed to fetch body for {url}:", exc_info=True)
+        except Exception as e:
+            log.error(f"{self.tracker}: Failed to fetch body for {url}: {e}")
+            log.debug(f"{self.tracker}: Network error details", exc_info=True)
             return ""

@@ -41,4 +41,5 @@ def save_html(tracker: str, html_content: str) -> None:
         file_path.write_text(html_content, encoding="utf-8")
         log.debug(f"{tracker}: HTML saved to {file_path}")
     except Exception as e:
-        log.error(f"{tracker}: Failed to save HTML debug file:", exc_info=e)
+        log.error(f"{tracker}: Failed to save HTML debug file: {e}")
+        log.debug(f"{tracker}: HTML save error details", exc_info=True)

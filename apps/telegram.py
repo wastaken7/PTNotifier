@@ -70,7 +70,8 @@ async def send_telegram(
             if not resp.is_success:
                 log.error(f"Telegram Error: {resp.text}")
         except Exception as e:
-            log.error("Telegram Exception:", exc_info=e)
+            log.error(f"Telegram Exception: {e}")
+            log.debug("Telegram error details", exc_info=True)
 
 def format_for_telegram(text: str) -> str:
     """

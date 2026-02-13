@@ -63,7 +63,8 @@ async def main():
                     if result and result > 0:
                         results.append(result)
                 except Exception as e:  # noqa: PERF203
-                    log.error("Tracker execution failed:", exc_info=e)
+                    log.error("Tracker execution failed. Use DEBUG mode for more info.")
+                    log.debug(f"Tracker error details: {e}", exc_info=True)
                 finally:
                     progress.update(main_task, advance=1)
 

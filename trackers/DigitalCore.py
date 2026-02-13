@@ -80,8 +80,10 @@ class DigitalCore(BaseTracker):
 
         try:
             data = json.loads(data)
-        except Exception:
-            log.error(f"{self.tracker}: Failed to parse notifications JSON.", exc_info=True)
+        except Exception as e:
+            log.error(f"{self.tracker}: Failed to parse notifications JSON: {e}")
+            log.debug(f"{self.tracker}: Raw data: {data}", exc_info=True)
+
             return new_items
 
         if not data:

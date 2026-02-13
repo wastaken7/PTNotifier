@@ -83,8 +83,9 @@ class Orpheus(BaseTracker):
                         "url": link,
                     }
                 )
-            except Exception:
-                log.error(f"{self.tracker}: Failed to process message: {msg}", exc_info=True)
+            except Exception as e:
+                log.error(f"{self.tracker}: Failed to process message: {e}")
+                log.debug(f"{self.tracker}: Raw data: {msg}", exc_info=True)
                 continue
         return new_items
 
