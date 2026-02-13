@@ -43,11 +43,14 @@ class Orpheus(BaseTracker):
         """Parses the inbox AJAX response."""
         new_items: list[dict[str, Any]] = []
         raw_data = await self._fetch_page(self.inbox_api, "messages", success_text='"status":"success"')
+        if not raw_data:
+            return new_items
 
         try:
             data = json.loads(raw_data)
         except Exception:
-            log.error(f"{self.tracker}: Failed to parse inbox JSON.", exc_info=True)
+            log.error(f"{self.tracker}: Failed to parse inbox JSON.")
+            log.debug(f"{self.tracker}: Raw data: {raw_data}", exc_info=True)
             return new_items
 
         if data.get("status") != "success":
