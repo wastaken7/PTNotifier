@@ -4,14 +4,16 @@ import asyncio
 import json
 import time
 from abc import ABC, abstractmethod
-from collections.abc import Coroutine
+from collections.abc import Callable, Coroutine
 from http.cookiejar import MozillaCookieJar
 from pathlib import Path
-from typing import Any, Callable, Optional
+from typing import Any, Optional
 
 import httpx
 
 import config
+from apps.discord import send_discord
+from apps.telegram import send_telegram
 from utils.console import log
 from utils.cookies import valid_response
 
@@ -116,12 +118,9 @@ class BaseTracker(ABC):
             if len(self.state["processed_ids"]) > 300:
                 self.state["processed_ids"] = self.state["processed_ids"][-300:]
 
-    async def fetch_notifications(
-        self,
-        notifiers: list[Callable[[dict[str, Any], str, str, str], Coroutine[Any, Any, None]]],
-    ) -> float:
+    async def fetch_notifications(self) -> float:
         if time.time() - self.state.get("last_run", 0) >= self.scrape_interval:
-            await self.process(notifiers)
+            await self.process()
             return self.scrape_interval
         else:
             remaining_time = self.state.get("last_run", 0) + self.scrape_interval - time.time()
@@ -129,11 +128,18 @@ class BaseTracker(ABC):
                 log.debug(f"{self.tracker}: Skipping check, next run in {remaining_time / 60:.2f} minutes.")
             return remaining_time
 
-    async def process(
-        self,
-        notifiers: list[Callable[[dict[str, Any], str, str, str], Coroutine[Any, Any, None]]],
-    ) -> None:
+    async def process(self) -> None:
         """Main loop to fetch and process notifications."""
+        notifiers: list[Callable[[dict[str, Any], str, str, str], Coroutine[Any, Any, None]]] = []
+        telegram_bot_token = config.SETTINGS.get("TELEGRAM_BOT_TOKEN")
+        telegram_chat_id = config.SETTINGS.get("TELEGRAM_CHAT_ID")
+        discord_webhook_url = config.SETTINGS.get("DISCORD_WEBHOOK_URL")
+
+        if telegram_bot_token and telegram_chat_id:
+            notifiers.append(send_telegram)
+        if discord_webhook_url:
+            notifiers.append(send_discord)
+
         try:
             all_items: list[dict[str, Any]] = await self._fetch_items()
 

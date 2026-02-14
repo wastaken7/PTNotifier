@@ -4,7 +4,7 @@ from typing import Any
 import httpx
 
 import config
-from trackers.base import log
+from utils.console import log
 
 
 async def send_telegram(

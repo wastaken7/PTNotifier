@@ -8,7 +8,7 @@ from anyio import Path
 from PIL import Image
 
 import config
-from trackers.base import log
+from utils.console import log
 
 
 async def get_local_favicon(client: httpx.AsyncClient, icon_url: str, tracker_name: str) -> tuple[Optional[Path], str]:
