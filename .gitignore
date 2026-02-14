@@ -3,3 +3,4 @@ cookies/
 state/
 debug/
 config.py
+.tox/
