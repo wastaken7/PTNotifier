@@ -1,4 +1,5 @@
-httpx[http2]
+aiofiles
 beautifulsoup4
-rich
+httpx[http2]
 Pillow
+rich

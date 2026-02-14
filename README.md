@@ -102,7 +102,7 @@ Follow these steps to set up PTNotifier.
 
 ### 1. Prerequisites
 
--   Python 3.8+
+-   Python 3.10 or higher.
 -   A Telegram Bot Token and a Chat ID, and/or a Discord Webhook URL.
 
 ### 2. Clone the Repository

@@ -20,11 +20,11 @@ async def main():
     """
     Main execution function that initializes trackers and runs the monitoring loop.
     """
-    await check_version()
     tracker_classes = load_trackers()
     cookies_dir = Path("./cookies")
 
     while True:
+        await check_version()
         tasks: list[asyncio.Task[Any] | Any] = []
 
         for tracker_name, tracker_class in tracker_classes.items():
