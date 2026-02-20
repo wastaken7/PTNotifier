@@ -52,6 +52,7 @@ These are specific trackers that have their own dedicated module. The cookie fil
 | `PTFans.py` | `ptfans.cc`| `PTFans.txt` | No longer maintained, support is provided as-is. |
 | `PTSKit.py` | `ptskit.org`| `PTSKit.txt` | - |
 | `SceneTime.py` | `scenetime.com`| `SceneTime.txt` | - |
+| `SportsCult.py` | `sportscult.org`| `SportsCult.txt` | - |
 | `TorrentDay.py` | `torrentday.com`| `TorrentDay.txt` | - |
 | `TorrentLeech.py` | `torrentleech.org`| `TorrentLeech.txt` | Currently only supports site notifications, not private messages. |
 
