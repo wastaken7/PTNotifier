@@ -39,6 +39,7 @@ These are specific trackers that have their own dedicated module. The cookie fil
 | `Anthelion.py` | `anthelion.me` | `Anthelion.txt` | - |
 | `BJShare.py` | `bj-share.info`| `BJShare.txt` | - |
 | `BrasilTracker.py` | `brasiltracker.org` | `BrasilTracker.txt` | - |
+| `BTSCHOOL.py` | `pt.btschool.club`| `BTSCHOOL.txt` | - |
 | `DigitalCore.py` | `digitalcore.club`| `DigitalCore.txt` | - |
 | `GreatPosterWall.py` | `greatposterwall.com`| `GreatPosterWall.txt` | - |
 | `HDCiTY.py` | `hdcity.city`| `HDCiTY.txt` | - |
