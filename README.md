@@ -178,6 +178,33 @@ python ptn.py
 
 The script will start, load all trackers with valid cookie files, and begin monitoring. The first run for each tracker will not send any notifications; it will only establish a baseline of existing items.
 
+### Docker
+
+You can also run PTNotifier in a Docker container. Make sure to set up your `config.py` and cookies as described above, then use the following command:
+
+```bash
+docker run -d --name ptn \
+    -v /path/to/your/config.py:/app/config.py \
+    -v /path/to/your/cookies:/app/cookies \
+    -v /path/to/state:/app/state \
+    --restart unless-stopped \
+    ghcr.io/wastaken7/ptnotifier:main
+```
+
+For docker-compose, you can use this example `docker-compose.yml`:
+
+```yaml
+services:
+    ptn:
+        image: ghcr.io/wastaken7/ptnotifier:main
+        container_name: ptn
+        volumes:
+            - /path/to/your/config.py:/app/config.py
+            - /path/to/your/cookies:/app/cookies
+            - /path/to/state:/app/state
+        restart: unless-stopped
+```
+
 ## Disclaimer
 
 Using scripts to interact with tracker sites may be against their rules. Use this tool at your own risk. The developer is not responsible for any consequences that may arise from its use. Always respect the tracker's rules and set a reasonable `CHECK_INTERVAL` to avoid getting your account banned.
