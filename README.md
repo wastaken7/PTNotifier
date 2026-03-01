@@ -42,12 +42,14 @@ These are specific trackers that have their own dedicated module. The cookie fil
 | `BTSCHOOL.py` | `pt.btschool.club`| `BTSCHOOL.txt` | - |
 | `DigitalCore.py` | `digitalcore.club`| `DigitalCore.txt` | - |
 | `GreatPosterWall.py` | `greatposterwall.com`| `GreatPosterWall.txt` | - |
+| `HawkeUno.py` | `hawke.uno`| `HawkeUno.txt` | - |
 | `HDCiTY.py` | `hdcity.city`| `HDCiTY.txt` | - |
 | `HDSpace.py` | `hd-space.org`| `HDSpace.txt` | - |
 | `HDTorrents.py` | `hd-torrents.org`| `HDTorrents.txt` | ⚠️ PTN spoofs the User-Agent for it to work. |
 | `ImmortalSeed.py` | `immortalseed.me`| `ImmortalSeed.txt` | - |
 | `IPTorrents.py` | `iptorrents.com`| `IPTorrents.txt` | - |
 | `Lajidui.py` | `pt.lajidui.top`| `Lajidui.txt` | - |
+| `LongPT.py` | `longpt.org`| `LongPT.txt` | - |
 | `March.py` | `duckboobee.org`| `March.txt` | - |
 | `Orpheus.py` | `orpheus.network`| `Orpheus.txt` | It is necessary to add an API key in config.py |
 | `PTFans.py` | `ptfans.cc`| `PTFans.txt` | No longer maintained, support is provided as-is. |
