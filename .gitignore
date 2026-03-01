@@ -3,3 +3,5 @@ cookies/
 state/
 debug/
 config.py
+.vscode/
+.venv/
