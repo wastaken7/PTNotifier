@@ -31,7 +31,7 @@ class UNIT3D(BaseTracker):
                 "Connection": "keep-alive",
             }
         )
-        if self.domain == "eiga.moi" or self.domain == "hawke.uno":
+        if self.domain == "hawke.uno":
             self.notifications_url = f"https://{self.domain}/notifications"
             self.messages_url = f"https://{self.domain}/mail/inbox"
         else:
