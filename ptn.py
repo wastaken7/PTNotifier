@@ -13,7 +13,7 @@ from utils.config_validator import load_config
 from utils.console import log
 from utils.tracker_loader import load_trackers
 
-user_config, api_tokens, discord_webhook_url, telegram_bot_token, telegram_chat_id, gotify_url, gotify_token = load_config()
+user_config, api_tokens, discord_webhook_url, telegram_bot_token, telegram_chat_id, gotify_url, gotify_token, ntfy_url, ntfy_topic = load_config()
 
 
 async def main():

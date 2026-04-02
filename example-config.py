@@ -6,6 +6,10 @@ SETTINGS: dict[str, Any] = {
     "DISCORD_WEBHOOK_URL": "",
     "GOTIFY_URL": "",
     "GOTIFY_TOKEN": "",
+    "NTFY_URL": "https://ntfy.sh",
+    "NTFY_TOPIC": "",
+    "NTFY_TOKEN": "",
+    "NTFY_PRIORITY": 3,
     # Seconds between checks
     # Make sure not to overload trackers
     # It might get you banned!

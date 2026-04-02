@@ -1,19 +1,19 @@
 # PTNotifier (Private Tracker Notifier)
 
-PTNotifier is a Python-based tool designed to monitor private torrent trackers for new notifications and private messages, sending alerts to a specified Telegram, Discord chat, and/or Gotify.
+PTNotifier is a Python-based tool designed to monitor private torrent trackers for new notifications and private messages, sending alerts to a specified Telegram, Discord chat, Gotify, and/or ntfy.
 
 ## How It Works
 
 The script dynamically loads tracker modules from the `trackers/` directory. For each tracker, it uses stored browser cookies to authenticate and then scrapes the notifications and messages pages for unread items. It maintains a simple state file for each tracker to keep track of processed items, ensuring that notifications are sent only once.
 
-New notifications are formatted and sent to a Telegram chat, a Discord channel via a webhook, or a Gotify instance. The script runs in a continuous loop, with a configurable interval between checks.
+New notifications are formatted and sent to a Telegram chat, a Discord channel via a webhook, a Gotify instance, or an ntfy topic. The script runs in a continuous loop, with a configurable interval between checks.
 
 ## Features
 
 -   Monitors multiple private trackers simultaneously.
 -   Sends notifications for new site alerts and private messages.
 -   Easy to configure via a `config.py` file.
--   Uses Telegram, Discord, and/or Gotify for notifications.
+-   Uses Telegram, Discord, Gotify, and/or ntfy for notifications.
 -   Dynamically loads tracker modules.
 
 ## Supported Trackers
@@ -117,12 +117,24 @@ You can receive notifications in a private chat or a group.
 
 </details>
 
+### ntfy Setup
+
+<details>
+<summary>Click to reveal instructions for ntfy Setup</summary>
+
+1. Choose a public ntfy topic on `https://ntfy.sh/` or host your own ntfy server.
+2. The URL of your ntfy server (e.g., `https://ntfy.sh`) is your **`NTFY_URL`**.
+3. Choose a unique topic name (e.g., `mytopic123`) to receive updates, which is your **`NTFY_TOPIC`**.
+4. (Optional) If you are using a self-hosted instance with Access Control, generate a token and use it as **`NTFY_TOKEN`**.
+
+</details>
+
 Follow these steps to set up PTNotifier.
 
 ### 1. Prerequisites
 
 -   Python 3.10 or higher.
--   A Telegram Bot Token and Chat ID, a Discord Webhook URL, or Gotify URL and Token.
+-   A Telegram Bot Token and Chat ID, a Discord Webhook URL, a Gotify URL and Token, or an ntfy URL and Topic.
 
 ### 2. Clone the Repository
 
@@ -155,6 +167,10 @@ The first time you run the script, it will create a `config.py` file from `examp
 -   **`DISCORD_WEBHOOK_URL`**: Your Discord webhook URL.
 -   **`GOTIFY_URL`**: The URL of your Gotify instance.
 -   **`GOTIFY_TOKEN`**: Your Gotify App token.
+-   **`NTFY_URL`**: The URL of your ntfy instance (e.g. `https://ntfy.sh`).
+-   **`NTFY_TOPIC`**: The name of the ntfy topic.
+-   **`NTFY_TOKEN`**: (Optional) Bearer token for protected ntfy topics.
+-   **`NTFY_PRIORITY`**: Priority level for ntfy notifications (default: 3).
 -   **`CHECK_INTERVAL`**: The time in seconds between checks. The minimum is 900 seconds (15 minutes) to avoid spamming trackers. Please note that some trackers have specific rules regarding the frequency of automated requests, and PTN will automatically adjust the interval if it is set too low for that specific tracker.
 -   **`MARK_AS_READ`**: (Optional) For some trackers, the script can attempt to mark notifications as read. Set to `True` or `False`.
 -   **`TIMEOUT`**: The timeout in seconds for network requests.
