@@ -13,6 +13,7 @@ import httpx
 
 import config
 from apps.discord import send_discord
+from apps.gotify import send_gotify
 from apps.telegram import send_telegram
 from utils.console import log
 from utils.cookies import valid_response
@@ -134,11 +135,15 @@ class BaseTracker(ABC):
         telegram_bot_token = config.SETTINGS.get("TELEGRAM_BOT_TOKEN")
         telegram_chat_id = config.SETTINGS.get("TELEGRAM_CHAT_ID")
         discord_webhook_url = config.SETTINGS.get("DISCORD_WEBHOOK_URL")
+        gotify_url = config.SETTINGS.get("GOTIFY_URL")
+        gotify_token = config.SETTINGS.get("GOTIFY_TOKEN")
 
         if telegram_bot_token and telegram_chat_id:
             notifiers.append(send_telegram)
         if discord_webhook_url:
             notifiers.append(send_discord)
+        if gotify_url and gotify_token:
+            notifiers.append(send_gotify)
 
         try:
             all_items: list[dict[str, Any]] = await self._fetch_items()

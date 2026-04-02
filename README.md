@@ -1,19 +1,19 @@
 # PTNotifier (Private Tracker Notifier)
 
-PTNotifier is a Python-based tool designed to monitor private torrent trackers for new notifications and private messages, sending alerts to a specified Telegram and/or Discord chat.
+PTNotifier is a Python-based tool designed to monitor private torrent trackers for new notifications and private messages, sending alerts to a specified Telegram, Discord chat, and/or Gotify.
 
 ## How It Works
 
 The script dynamically loads tracker modules from the `trackers/` directory. For each tracker, it uses stored browser cookies to authenticate and then scrapes the notifications and messages pages for unread items. It maintains a simple state file for each tracker to keep track of processed items, ensuring that notifications are sent only once.
 
-New notifications are formatted and sent to a Telegram chat or a Discord channel via a bot or a webhook. The script runs in a continuous loop, with a configurable interval between checks.
+New notifications are formatted and sent to a Telegram chat, a Discord channel via a webhook, or a Gotify instance. The script runs in a continuous loop, with a configurable interval between checks.
 
 ## Features
 
 -   Monitors multiple private trackers simultaneously.
 -   Sends notifications for new site alerts and private messages.
 -   Easy to configure via a `config.py` file.
--   Uses Telegram and/or Discord for notifications.
+-   Uses Telegram, Discord, and/or Gotify for notifications.
 -   Dynamically loads tracker modules.
 
 ## Supported Trackers
@@ -102,12 +102,27 @@ You can receive notifications in a private chat or a group.
 
 </details>
 
+### Gotify Setup
+
+<details>
+<summary>Click to reveal instructions for creating a Gotify App</summary>
+
+1. Open your Gotify instance and log in.
+2. Go to the "Apps" tab.
+3. Click "Create Application".
+4. Enter a name (e.g., PTNotifier) and optionally a description.
+5. Click the "Create" button.
+6. Copy the "Token" generated for your new app. This is your **`GOTIFY_TOKEN`**.
+7. The URL of your Gotify instance (e.g., `https://gotify.example.com`) is your **`GOTIFY_URL`**.
+
+</details>
+
 Follow these steps to set up PTNotifier.
 
 ### 1. Prerequisites
 
 -   Python 3.10 or higher.
--   A Telegram Bot Token and a Chat ID, and/or a Discord Webhook URL.
+-   A Telegram Bot Token and Chat ID, a Discord Webhook URL, or Gotify URL and Token.
 
 ### 2. Clone the Repository
 
@@ -138,6 +153,8 @@ The first time you run the script, it will create a `config.py` file from `examp
 -   **`TELEGRAM_BOT_TOKEN`**: Your Telegram bot's API token.
 -   **`TELEGRAM_CHAT_ID`**: The ID of the Telegram chat where you want to receive notifications. You can also provide a `TELEGRAM_TOPIC_ID` if you want to send messages to a specific topic in a group.
 -   **`DISCORD_WEBHOOK_URL`**: Your Discord webhook URL.
+-   **`GOTIFY_URL`**: The URL of your Gotify instance.
+-   **`GOTIFY_TOKEN`**: Your Gotify App token.
 -   **`CHECK_INTERVAL`**: The time in seconds between checks. The minimum is 900 seconds (15 minutes) to avoid spamming trackers. Please note that some trackers have specific rules regarding the frequency of automated requests, and PTN will automatically adjust the interval if it is set too low for that specific tracker.
 -   **`MARK_AS_READ`**: (Optional) For some trackers, the script can attempt to mark notifications as read. Set to `True` or `False`.
 -   **`TIMEOUT`**: The timeout in seconds for network requests.

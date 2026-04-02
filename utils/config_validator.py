@@ -3,7 +3,7 @@ from typing import Any
 from utils.console import log
 
 
-def load_config() -> tuple[dict[str, Any], dict[str, str], str | None, str | None, str | None]:
+def load_config() -> tuple[dict[str, Any], dict[str, str], str | None, str | None, str | None, str | None, str | None]:
     try:
         import config as _imported_config
     except ImportError:
@@ -20,6 +20,8 @@ def load_config() -> tuple[dict[str, Any], dict[str, str], str | None, str | Non
         telegram_bot_token = user_config.get("TELEGRAM_BOT_TOKEN")
         telegram_chat_id = user_config.get("TELEGRAM_CHAT_ID")
         discord_webhook_url = user_config.get("DISCORD_WEBHOOK_URL")
+        gotify_url = user_config.get("GOTIFY_URL")
+        gotify_token = user_config.get("GOTIFY_TOKEN")
 
     except Exception as e:
         log.error(f"Error loading config.py: {e}")
@@ -27,9 +29,13 @@ def load_config() -> tuple[dict[str, Any], dict[str, str], str | None, str | Non
         log.error("Check example-config.py for any missing fields.")
         exit(1)
 
-    if (not telegram_bot_token or not telegram_chat_id) and not discord_webhook_url:
-        log.error("Please set TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID or DISCORD_WEBHOOK_URL in config.py")
+    has_telegram = telegram_bot_token and telegram_chat_id
+    has_discord = discord_webhook_url
+    has_gotify = gotify_url and gotify_token
+
+    if not has_telegram and not has_discord and not has_gotify:
+        log.error("Please set TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID, DISCORD_WEBHOOK_URL, or GOTIFY_URL and GOTIFY_TOKEN in config.py")
         exit(1)
 
-    return user_config, api_tokens, discord_webhook_url, telegram_bot_token, telegram_chat_id
+    return user_config, api_tokens, discord_webhook_url, telegram_bot_token, telegram_chat_id, gotify_url, gotify_token
 
