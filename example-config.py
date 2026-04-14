@@ -29,4 +29,6 @@ SETTINGS: dict[str, Any] = {
 API_TOKENS: dict[str, str] = {
     # Although Orpheus supports API, you still need to export cookies.
     "Orpheus": "",
+    # Only "User" permission is required.
+    "Anthelion": "",
 }

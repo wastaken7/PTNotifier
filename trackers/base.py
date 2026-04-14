@@ -47,11 +47,12 @@ class BaseTracker(ABC):
         self.state_path = Path("./state") / f"{self.tracker}.json"
         self.state: dict[str, Any] = self._load_state()
         self.first_run = False
-        try:
-            self.cookie_jar.load(ignore_discard=True, ignore_expires=True)
-        except Exception as e:
-            log.error(f"{self.tracker}: Failed to load cookies from {self.filename}: {e}")
-            log.debug("Cookie error details", exc_info=True)
+        if not getattr(self, "api_only", False):
+            try:
+                self.cookie_jar.load(ignore_discard=True, ignore_expires=True)
+            except Exception as e:
+                log.error(f"{self.tracker}: Failed to load cookies from {self.filename}: {e}")
+                log.debug("Cookie error details", exc_info=True)
 
         self.headers = {
             "User-Agent": "PTNotifier 1.0 (https://github.com/wastaken7/PTNotifier)",

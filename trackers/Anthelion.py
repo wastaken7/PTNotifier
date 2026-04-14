@@ -1,21 +1,24 @@
 #!/usr/bin/env python3
 
+import json
+import re
 from pathlib import Path
 from typing import Any
 from urllib.parse import urljoin
 
-from bs4 import BeautifulSoup
-from rich.console import Console
+import config
+from utils.console import log
 
 from .base import BaseTracker
-
-console = Console()
 
 
 class Anthelion(BaseTracker):
     """
     Manages a session for Anthelion.
+    Uses the official Anthelion API for inbox messages.
     """
+
+    api_only = True
 
     def __init__(self, cookie_path: Path):
         super().__init__(
@@ -23,103 +26,71 @@ class Anthelion(BaseTracker):
             tracker_name="Anthelion",
             base_url="https://anthelion.me/",
         )
-        self.inbox_url = urljoin(self.base_url, "inbox.php?sort=unread")
-        self.staff_url = urljoin(self.base_url, "staffpm.php")
+        self.api_key = config.API_TOKENS.get("Anthelion")
+        self.inbox_api = f"{self.base_url}api.php?action=inbox&api_key={self.api_key}"
 
     async def _fetch_items(self) -> list[dict[str, Any]]:
-        """Fetch standard and staff messages."""
-        inbox_items = await self._parse_messages(self.inbox_url, is_staff=False)
-        staff_items = await self._parse_messages(self.staff_url, is_staff=True)
-        return inbox_items + staff_items
+        """Fetch messages from the Anthelion API."""
+        if not self.api_key:
+            log.warning(f"{self.tracker}: API key not found in config. Skipping...")
+            return []
 
-    async def _parse_messages(self, url: str, is_staff: bool) -> list[dict[str, Any]]:
-        """Parses the message table and fetches bodies for unread conversations."""
+        return await self._fetch_inbox()
+
+    async def _fetch_inbox(self) -> list[dict[str, Any]]:
+        """Parses the inbox API response and returns new message items."""
         new_items: list[dict[str, Any]] = []
-        message_type = "messages" if not is_staff else "staff messages"
-        response = await self._fetch_page(url, message_type, success_text="forums.php")
-        soup = BeautifulSoup(response, "html.parser")
-        if not soup:
+        raw_data = await self._fetch_page(self.inbox_api, "messages", success_text='"status": "success"')
+        if not raw_data:
             return new_items
 
-        tables = soup.find_all("table", class_="message_table")
-        if not tables:
+        try:
+            data = json.loads(raw_data)
+        except Exception:
+            log.error(f"{self.tracker}: Failed to parse inbox JSON.")
+            log.debug(f"{self.tracker}: Raw data: {raw_data}", exc_info=True)
             return new_items
 
-        for table in tables:
-            rows = table.find_all("tr", class_="unreadpm")
-            for row in rows:
-                cols = row.find_all("td")
-                if len(cols) < 3:
+        if data.get("status") != "success":
+            log.error(f"{self.tracker}: API returned non-success status.")
+            return new_items
+
+        messages = data.get("response", {}).get("messages", [])
+
+        for msg in messages:
+            try:
+                message_id = str(msg.get("message_id", ""))
+                if not message_id or message_id in self.state["processed_ids"]:
                     continue
 
-                subject_cell = cols[1].find("a")
-                if not subject_cell:
-                    continue
+                conv_id = str(msg.get("conv_id", ""))
+                sender = msg.get("sender", "System")
+                subject = msg.get("subject", "No Subject")
+                body = msg.get("body", "")
+                if isinstance(body, bool):
+                    body = ""
+                else:
+                    body = re.sub(r"\[\[([^\]]+)\]\]", r"\1", body)
+                    body = re.sub(r"\[torrent\]([^\[]+)\[/torrent\]", r"https://anthelion.me/torrents.php?id=\1", body)
+                    body = re.sub(r"\[/?[^\]]+\]", "", body).strip()
+                date = msg.get("sent_date", "")
+                link = urljoin(self.base_url, f"inbox.php?action=viewconv&id={conv_id}")
 
-                subject = subject_cell.get_text(strip=True)
-                href = subject_cell.get("href", "")
-                link = urljoin(self.base_url, str(href))
-
-                messages = await self._fetch_body(link, subject, is_staff)
-                new_items.extend(messages)
-
-        return new_items
-
-    async def _fetch_body(self, url: str, subject: str, is_staff: bool) -> list[dict[str, Any]]:
-        """
-        Fetches the conversation page and extracts individual messages.
-        Each message is treated as a unique item based on its internal ID.
-        """
-        messages_found: list[dict[str, Any]] = []
-        response = await self._fetch_page(url, "message body")
-        soup = BeautifulSoup(response, "html.parser")
-        if not soup:
-            return messages_found
-
-        containers = soup.find_all("div", class_="box vertical_space")
-
-        for box in containers:
-            message_id = None
-            body_div = box.find("div", class_="body")
-
-            if is_staff:
-                raw_id = box.get("id", "")
-                message_id = str(raw_id).replace("post", "") if raw_id else None
-            elif body_div:
-                raw_id = body_div.get("id", "")
-                message_id = str(raw_id).replace("message", "") if raw_id else None
-
-            if not message_id or message_id in self.state["processed_ids"]:
+                new_items.append(
+                    {
+                        "type": "message",
+                        "id": message_id,
+                        "sender": sender,
+                        "subject": subject,
+                        "body": body,
+                        "date": date,
+                        "url": link,
+                    }
+                )
+                self.state["processed_ids"].append(message_id)
+            except Exception as e:
+                log.error(f"{self.tracker}: Failed to process message: {e}")
+                log.debug(f"{self.tracker}: Raw data: {msg}", exc_info=True)
                 continue
 
-            head = box.find("div", class_="head")
-            sender = "System"
-            if head:
-                sender_link = head.find("a", href=True)
-                if sender_link:
-                    sender = sender_link.get_text(strip=True)
-
-            date_str = "Unknown"
-            if head:
-                date_span = head.find("span", class_="time")
-                if date_span:
-                    date_str = date_span.get_text(strip=True)
-
-            body_text = "No content"
-            if body_div:
-                body_text = body_div.get_text("\n\n", strip=True)
-
-            messages_found.append(
-                {
-                    "type": "message",
-                    "id": message_id,
-                    "sender": sender,
-                    "subject": subject,
-                    "body": body_text,
-                    "date": date_str,
-                    "url": f"{url}#post{message_id}" if is_staff else f"{url}#message{message_id}",
-                    "is_staff": is_staff,
-                }
-            )
-
-        return messages_found
+        return new_items

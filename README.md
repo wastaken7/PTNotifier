@@ -36,7 +36,7 @@ These are specific trackers that have their own dedicated module. The cookie fil
 | `UNIT3D.py` | - | - | All UNIT3D trackers (in theory), if the tracker is highly customized, it is likely that it will not work. If you do not know whether a tracker is UNIT3D, check it's code base [here](https://hdvinnie.github.io/Private-Trackers-Spreadsheet/). |
 | `AvistaZ.py` | - | - | This includes AvistaZ, CinemaZ, PrivateHD, ExoticaZ.|
 | `AmigosShareClub.py` | `cliente.amigos-share.club`| `AmigosShareClub.txt` | - |
-| `Anthelion.py` | `anthelion.me` | `Anthelion.txt` | - |
+| `Anthelion.py` | `anthelion.me` | - | API Key required in config.py |
 | `BJShare.py` | `bj-share.info`| `BJShare.txt` | - |
 | `BrasilTracker.py` | `brasiltracker.org` | `BrasilTracker.txt` | - |
 | `BTSCHOOL.py` | `pt.btschool.club`| `BTSCHOOL.txt` | - |

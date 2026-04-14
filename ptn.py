@@ -58,6 +58,26 @@ async def main():
                     tasks.append(wrapped_task())  # type: ignore
                     seen_files.add(path_obj)
 
+        # Instantiate API-only trackers that have a configured API key.
+        for tracker_name, tracker_class in tracker_classes.items():
+            if not getattr(tracker_class, "api_only", False):
+                continue
+            if not api_tokens.get(tracker_name):
+                continue
+
+            tracker_instance = tracker_class(Path("./cookies") / f"{tracker_name}.txt")
+
+            async def wrapped_api_task(t_name: str = tracker_name, inst: Any = tracker_instance) -> tuple[str, Any]:
+                try:
+                    res = await inst.fetch_notifications()
+                    return t_name, res
+                except Exception as e:
+                    log.error(f"{t_name}: Tracker execution failed.")
+                    log.debug(f"{t_name}: Error details: {e}", exc_info=True)
+                    return t_name, None
+
+            tasks.append(wrapped_api_task())  # type: ignore
+
         if not tasks:
             log.warning("No tracker tasks found. Waiting 60s...")
             await asyncio.sleep(60)
