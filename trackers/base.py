@@ -45,8 +45,8 @@ class BaseTracker(ABC):
         self.cookie_jar = MozillaCookieJar(self.cookie_path)
         self.base_url = base_url
         self.state_path = Path("./state") / f"{self.tracker}.json"
-        self.state: dict[str, Any] = self._load_state()
         self.first_run = False
+        self.state: dict[str, Any] = self._load_state()
         if not getattr(self, "api_only", False):
             try:
                 self.cookie_jar.load(ignore_discard=True, ignore_expires=True)
