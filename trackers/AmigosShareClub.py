@@ -24,6 +24,7 @@ class AmigosShareClub(BaseTracker):
             base_url="https://cliente.amigos-share.club/",
         )
         self.inbox_url = "https://cliente.amigos-share.club/mensagens.php?do=n_lidas"
+        self.read_inbox_url = "https://cliente.amigos-share.club/mensagens.php"
 
     async def _fetch_items(self) -> list[dict[str, Any]]:
         """Fetch messages from ASC inbox and include their bodies."""
@@ -33,6 +34,18 @@ class AmigosShareClub(BaseTracker):
             item["body"] = await self._fetch_body(item["id"])
 
         return inbox_items
+
+    async def _fetch_test_item(self) -> dict[str, Any] | None:
+        unread_items = await self._fetch_items()
+        if unread_items:
+            return unread_items[0]
+
+        read_items = await self._parse_messages(self.read_inbox_url, ignore_processed=True)
+        if not read_items:
+            return None
+
+        read_items[0]["body"] = await self._fetch_body(read_items[0]["id"])
+        return read_items[0]
 
     async def _fetch_body(self, message_id: str) -> str:
         """
@@ -81,7 +94,7 @@ class AmigosShareClub(BaseTracker):
             log.debug("Unexpected error details", exc_info=True)
             return "Error retrieving content."
 
-    async def _parse_messages(self, url: str) -> list[dict[str, Any]]:
+    async def _parse_messages(self, url: str, ignore_processed: bool = False) -> list[dict[str, Any]]:
         """Parses the inbox for ASC messages."""
         new_items: list[dict[str, Any]] = []
         response = await self._fetch_page(url, "messages", success_text="Reputação")
@@ -103,7 +116,7 @@ class AmigosShareClub(BaseTracker):
 
             item_id = str(item_id)
 
-            if item_id in self.state["processed_ids"]:
+            if not ignore_processed and item_id in self.state["processed_ids"]:
                 continue
 
             sender_cell = row.find("td", class_="inbox-small-cells")

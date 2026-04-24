@@ -44,6 +44,17 @@ class AvistaZ(BaseTracker):
         messages = await self._fetch_and_parse_messages()
         return notifications + messages
 
+    async def _fetch_test_item(self) -> dict[str, Any] | None:
+        unread_items = await self._fetch_items()
+        if unread_items:
+            return unread_items[0]
+
+        read_messages = await self._fetch_and_parse_messages(include_read=True, ignore_processed=True)
+        if read_messages:
+            return read_messages[0]
+
+        return None
+
     async def _fetch_and_parse_notifications(self) -> list[dict[str, Any]]:
         new_items: list[dict[str, Any]] = []
         response = await self._fetch_page(self.notifications_url, "notifications")
@@ -87,7 +98,7 @@ class AvistaZ(BaseTracker):
             )
         return new_items
 
-    async def _fetch_and_parse_messages(self) -> list[dict[str, Any]]:
+    async def _fetch_and_parse_messages(self, include_read: bool = False, ignore_processed: bool = False) -> list[dict[str, Any]]:
         new_items: list[dict[str, Any]] = []
         response = await self._fetch_page(self.messages_url, "messages", success_text="messenger/new")
         soup = BeautifulSoup(response, "html.parser")
@@ -102,7 +113,7 @@ class AvistaZ(BaseTracker):
         if not tbody:
             return new_items
 
-        rows = tbody.find_all("tr", class_="info text-bold")
+        rows = tbody.find_all("tr") if include_read else tbody.find_all("tr", class_="info text-bold")
         for row in rows:
             cols = row.find_all("td")
             if len(cols) < 5:
@@ -116,6 +127,9 @@ class AvistaZ(BaseTracker):
             subject = subject_cell.get_text(strip=True)
             link = str(subject_cell["href"])
             age = cols[4].get_text(strip=True)
+
+            if not ignore_processed and link in self.state["processed_ids"]:
+                continue
 
             body = await self._fetch_body(link)
 

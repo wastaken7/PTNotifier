@@ -24,6 +24,7 @@ class BrasilTracker(BaseTracker):
             base_url="https://brasiltracker.org/",
         )
         self.inbox_url = urljoin(self.base_url, "inbox.php?sort=unread")
+        self.read_inbox_url = urljoin(self.base_url, "inbox.php")
         self.staff_url = urljoin(self.base_url, "staffpm.php")
 
     async def _fetch_items(self) -> list[dict[str, Any]]:
@@ -32,7 +33,22 @@ class BrasilTracker(BaseTracker):
         staff_items = await self._parse_messages(self.staff_url, is_staff=True)
         return inbox_items + staff_items
 
-    async def _parse_messages(self, url: str, is_staff: bool) -> list[dict[str, Any]]:
+    async def _fetch_test_item(self) -> dict[str, Any] | None:
+        unread_items = await self._fetch_items()
+        if unread_items:
+            return unread_items[0]
+
+        read_items = await self._parse_messages(self.read_inbox_url, is_staff=False, include_read=True, ignore_processed=True)
+        if read_items:
+            return read_items[0]
+
+        staff_items = await self._parse_messages(self.staff_url, is_staff=True, include_read=True, ignore_processed=True)
+        if staff_items:
+            return staff_items[0]
+
+        return None
+
+    async def _parse_messages(self, url: str, is_staff: bool, include_read: bool = False, ignore_processed: bool = False) -> list[dict[str, Any]]:
         """Parses message tables for unread conversations."""
         new_items: list[dict[str, Any]] = []
         message_type = "messages" if not is_staff else "staff messages"
@@ -47,7 +63,7 @@ class BrasilTracker(BaseTracker):
             return new_items
 
         for table in tables:
-            rows = table.find_all("tr", class_="unreadpm")
+            rows = table.find_all("tr") if include_read else table.find_all("tr", class_="unreadpm")
             for row in rows:
                 cols = row.find_all("td")
                 if len(cols) < 3:
@@ -61,12 +77,12 @@ class BrasilTracker(BaseTracker):
                 href = subject_cell.get("href", "")
                 link = urljoin(self.base_url, str(href))
 
-                messages = await self._fetch_body(link, subject, is_staff)
+                messages = await self._fetch_body(link, subject, is_staff, ignore_processed=ignore_processed)
                 new_items.extend(messages)
 
         return new_items
 
-    async def _fetch_body(self, url: str, subject: str, is_staff: bool) -> list[dict[str, Any]]:
+    async def _fetch_body(self, url: str, subject: str, is_staff: bool, ignore_processed: bool = False) -> list[dict[str, Any]]:
         """
         Fetches the conversation page and extracts individual messages.
         """
@@ -86,7 +102,7 @@ class BrasilTracker(BaseTracker):
             raw_id = body_div.get("id", "")
             message_id = str(raw_id).replace("message", "") if raw_id else None
 
-            if not message_id or message_id in self.state["processed_ids"]:
+            if not message_id or (not ignore_processed and message_id in self.state["processed_ids"]):
                 continue
 
             head = box.find("div", class_="head")

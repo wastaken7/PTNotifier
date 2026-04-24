@@ -219,6 +219,22 @@ class BaseTracker(ABC):
         items = await self._fetch_items()
         if items:
             return items[0]
+
+        return await self._fetch_processed_test_item()
+
+    async def _fetch_processed_test_item(self) -> Optional[dict[str, Any]]:
+        original_processed_ids = list(self.state.get("processed_ids", []))
+
+        try:
+            self.state["processed_ids"] = []
+            items = await self._fetch_items()
+        finally:
+            self.state["processed_ids"] = original_processed_ids
+
+        for item in items:
+            if item.get("type") == "message":
+                return item
+
         return None
 
     @staticmethod

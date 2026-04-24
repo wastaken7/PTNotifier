@@ -65,10 +65,17 @@ def iter_tracker_instances(tracker_classes: dict[str, Any]) -> list[tuple[str, A
 async def run_test_notification(tracker_classes: dict[str, Any], target_tracker: str | None) -> int:
     candidates = iter_tracker_instances(tracker_classes)
     if target_tracker:
+        normalized_target = target_tracker.lower()
         candidates = [
             (tracker_name, tracker_instance)
             for tracker_name, tracker_instance in candidates
-            if tracker_name.lower() == target_tracker.lower() or tracker_instance.tracker.lower() == target_tracker.lower()
+            if normalized_target in {
+                tracker_name.lower(),
+                tracker_instance.tracker.lower(),
+                tracker_instance.__class__.__name__.lower(),
+                getattr(tracker_instance, "domain", "").lower(),
+                Path(getattr(tracker_instance, "filename", "")).stem.lower(),
+            }
         ]
 
     if not candidates:

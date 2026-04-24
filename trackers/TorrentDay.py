@@ -29,7 +29,18 @@ class TorrentDay(BaseTracker):
         inbox_items = await self._parse_messages(self.inbox_url)
         return inbox_items
 
-    async def _parse_messages(self, url: str) -> list[dict[str, Any]]:
+    async def _fetch_test_item(self) -> dict[str, Any] | None:
+        unread_items = await self._fetch_items()
+        if unread_items:
+            return unread_items[0]
+
+        read_items = await self._parse_messages(self.inbox_url, include_read=True, ignore_processed=True)
+        if read_items:
+            return read_items[0]
+
+        return None
+
+    async def _parse_messages(self, url: str, include_read: bool = False, ignore_processed: bool = False) -> list[dict[str, Any]]:
         """Parses the inbox for TorrentDay messages and filters unread ones."""
         new_items: list[dict[str, Any]] = []
         response = await self._fetch_page(url, "messages", success_text="mybonus.php")
@@ -50,7 +61,7 @@ class TorrentDay(BaseTracker):
                 continue
 
             status_img = cells[0].find("img", src=lambda s: bool(s and "unreadMsg.png" in s))
-            if not status_img:
+            if not status_img and not include_read:
                 continue
 
             sender_link = cells[0].find("a")
@@ -66,6 +77,8 @@ class TorrentDay(BaseTracker):
                 continue
 
             item_id = relative_url.split("/")[-1].split("#")[0]
+            if not ignore_processed and item_id in self.state["processed_ids"]:
+                continue
 
             date_str = cells[2].get_text(strip=True)
             full_link = urljoin(self.base_url, relative_url)
