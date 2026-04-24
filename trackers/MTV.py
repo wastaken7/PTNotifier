@@ -172,7 +172,7 @@ class MTV(BaseTracker):
         if not soup:
             return new_items
 
-        rows = soup.find_all("tr", class_=lambda value: bool(value and "unreadpm" in str(value).lower()))
+        rows = self._find_inbox_rows(soup)
         for row in rows:
             cols = row.find_all("td")
             if len(cols) < 4:
@@ -208,7 +208,7 @@ class MTV(BaseTracker):
         if not soup:
             return new_items
 
-        rows = soup.find_all("tr", class_=lambda value: bool(value and "unreadpm" in str(value).lower()))
+        rows = self._find_staff_open_rows(soup)
         for row in rows:
             cols = row.find_all("td")
             if len(cols) < 4:
@@ -383,7 +383,9 @@ class MTV(BaseTracker):
                 if isinstance(box, Tag):
                     containers.append(box)
         else:
-            containers.extend(soup.find_all("table", class_=lambda value: bool(value and "forum_post" in str(value).lower())))
+            containers.extend(soup.find_all("table", id=lambda value: bool(value and str(value).startswith("post"))))
+            if not containers:
+                containers.extend(soup.find_all("table", class_=lambda value: bool(value and "forum_post" in str(value).lower())))
 
         deduped: list[Tag] = []
         seen_keys: set[int] = set()
@@ -397,6 +399,12 @@ class MTV(BaseTracker):
 
     def _extract_message_id(self, container: Tag, is_staff: bool) -> Optional[str]:
         if is_staff:
+            content_div = container.find("div", id=lambda value: bool(value and str(value).startswith("content")))
+            if content_div:
+                numeric = self._extract_numeric_id(str(content_div.get("id", "")))
+                if numeric:
+                    return numeric
+
             header = container.find_previous_sibling("div", class_="head")
             if header:
                 for link in header.find_all("a", href=True):
@@ -413,6 +421,12 @@ class MTV(BaseTracker):
                     return numeric
             return None
 
+        container_id = container.get("id")
+        if container_id:
+            numeric = self._extract_numeric_id(str(container_id))
+            if numeric:
+                return numeric
+
         for link in container.find_all("a", href=True):
             href = str(link.get("href", ""))
             if href.startswith("#"):
@@ -427,6 +441,17 @@ class MTV(BaseTracker):
         return None
 
     def _extract_message_body(self, container: Tag) -> str:
+        post_content = container.find("div", class_="post_content")
+        if post_content:
+            return post_content.get_text("\n\n", strip=True)
+
+        body_cell = container.find("td", class_="postbody")
+        if body_cell:
+            content = body_cell.find("div", class_="post_content")
+            if content:
+                return content.get_text("\n\n", strip=True)
+            return body_cell.get_text("\n\n", strip=True)
+
         body_cell = container.find("td", class_="body")
         if body_cell:
             preview = body_cell.find(id="contentpreview")
@@ -442,6 +467,10 @@ class MTV(BaseTracker):
         return container.get_text("\n\n", strip=True)
 
     def _extract_primary_conversation_body(self, soup: BeautifulSoup) -> str:
+        table = soup.find("table", id=lambda value: bool(value and str(value).startswith("post")))
+        if table:
+            return self._extract_message_body(table)
+
         table = soup.find("table", class_=lambda value: bool(value and "forum_post" in str(value).lower()))
         if table:
             return self._extract_message_body(table)
@@ -452,6 +481,20 @@ class MTV(BaseTracker):
         return ""
 
     def _extract_message_sender(self, container: Tag) -> str:
+        user_name = container.find_previous_sibling("div", class_="head")
+        if user_name:
+            sender_name = user_name.find("span", class_="user_name")
+            if sender_name:
+                sender_text = sender_name.get_text(" ", strip=True)
+                if sender_text:
+                    return sender_text
+
+        float_left = container.find("span", class_=lambda value: bool(value and "float_left" in str(value).lower()))
+        if float_left:
+            sender_text = self._extract_sender_from_header(float_left)
+            if sender_text:
+                return sender_text
+
         header = container.find("tr", class_=lambda value: bool(value and "smallhead" in str(value).lower()))
         if header:
             sender_link = header.find("a", href=lambda href: bool(href and "/user" in href))
@@ -496,6 +539,41 @@ class MTV(BaseTracker):
             return str(checkbox.get("value"))
         return None
 
+    def _find_inbox_rows(self, soup: BeautifulSoup) -> list[Tag]:
+        form = soup.find("form", id="messageform")
+        if not form:
+            return []
+
+        table = form.find("table")
+        if not table:
+            return []
+
+        rows: list[Tag] = []
+        for row in table.find_all("tr"):
+            if row.find("input", attrs={"name": "conversations[]"}):
+                rows.append(row)
+        return rows
+
+    def _find_staff_open_rows(self, soup: BeautifulSoup) -> list[Tag]:
+        inbox = soup.find("div", id="inbox")
+        if not inbox:
+            return []
+
+        open_heading = inbox.find("h3", string=lambda value: bool(value and value.strip().lower() == "open messages"))
+        if not open_heading:
+            return []
+
+        open_table = open_heading.find_next("table")
+        if not open_table:
+            return []
+
+        rows: list[Tag] = []
+        for row in open_table.find_all("tr"):
+            link = row.find("a", href=lambda href: bool(href and "staffpm.php?action=viewconv" in href))
+            if link:
+                rows.append(row)
+        return rows
+
     def _extract_primary_link(self, container: Tag) -> Optional[str]:
         for link in container.find_all("a", href=True):
             href = str(link.get("href", ""))
@@ -508,7 +586,7 @@ class MTV(BaseTracker):
         return None
 
     def _build_message_url(self, base_url: str, message_id: str, is_staff: bool) -> str:
-        fragment = f"#staff-message{message_id}" if is_staff else f"#message{message_id}"
+        fragment = f"#content{message_id}" if is_staff else f"#post{message_id}"
         return f"{base_url}{fragment}"
 
     def _is_unread_tag(self, tag: Tag) -> bool:
@@ -528,6 +606,23 @@ class MTV(BaseTracker):
         if match:
             return match.group(1)
         return None
+
+    def _extract_sender_from_header(self, header: Tag) -> str:
+        header_copy = BeautifulSoup(str(header), "html.parser")
+        post_id = header_copy.find("a", class_="post_id")
+        if post_id:
+            post_id.decompose()
+
+        time_span = header_copy.find("span", class_="time")
+        if time_span:
+            time_span.decompose()
+
+        for button in header_copy.find_all("button"):
+            button.decompose()
+
+        text = header_copy.get_text(" ", strip=True)
+        text = re.sub(r"\s*-\s*$", "", text).strip()
+        return text
 
     def _extract_form_token(self, html: str) -> str:
         soup = BeautifulSoup(html, "html.parser")
