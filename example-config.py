@@ -32,3 +32,14 @@ API_TOKENS: dict[str, str] = {
     # Only "User" permission is required.
     "Anthelion": "",
 }
+
+TRACKER_SETTINGS: dict[str, dict[str, Any]] = {
+    "MTV": {
+        # Optional: enables automatic relogin when MTV cookies expire.
+        "username": "",
+        "password": "",
+        # Optional: otpauth:// URI for automatic 2FA code generation.
+        # Example format: otpauth://totp/MoreThanTV:username?secret=BASE32SECRET&issuer=MoreThanTV
+        "otp_uri": "",
+    },
+}

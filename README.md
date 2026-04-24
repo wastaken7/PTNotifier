@@ -51,6 +51,7 @@ These are specific trackers that have their own dedicated module. The cookie fil
 | `Lajidui.py` | `pt.lajidui.top`| `Lajidui.txt` | - |
 | `LongPT.py` | `longpt.org`| `LongPT.txt` | - |
 | `March.py` | `duckboobee.org`| `March.txt` | - |
+| `MTV.py` | `morethantv.me`| `MTV.txt` | Supports inbox PMs, staff PMs, and attempts to discover a notifications page from the logged-in header. |
 | `Orpheus.py` | `orpheus.network`| `Orpheus.txt` | It is necessary to add an API key in config.py |
 | `PTFans.py` | `ptfans.cc`| `PTFans.txt` | No longer maintained, support is provided as-is. |
 | `PTSKit.py` | `ptskit.org`| `PTSKit.txt` | - |
@@ -175,6 +176,20 @@ The first time you run the script, it will create a `config.py` file from `examp
 -   **`MARK_AS_READ`**: (Optional) For some trackers, the script can attempt to mark notifications as read. Set to `True` or `False`.
 -   **`TIMEOUT`**: The timeout in seconds for network requests.
 -   **`REQUEST_DELAY`**: Delay in seconds between requests to avoid being rate-limited.
+
+Optional tracker-specific settings can also be added in `config.py` with a `TRACKER_SETTINGS` dictionary. MTV supports automatic relogin with:
+
+```python
+TRACKER_SETTINGS = {
+    "MTV": {
+        "username": "your-mtv-username",
+        "password": "your-mtv-password",
+        "otp_uri": "otpauth://totp/MoreThanTV:username?secret=BASE32SECRET&issuer=MoreThanTV",
+    }
+}
+```
+
+If `username` and `password` are set, PTNotifier will try to refresh expired MTV cookies automatically. If MTV prompts for 2FA, `otp_uri` is used to generate the current TOTP code automatically.
 
 ### 5. Add Tracker Cookies
 
