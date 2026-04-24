@@ -121,18 +121,7 @@ class BaseTracker(ABC):
             if len(self.state["processed_ids"]) > 300:
                 self.state["processed_ids"] = self.state["processed_ids"][-300:]
 
-    async def fetch_notifications(self) -> float:
-        if time.time() - self.state.get("last_run", 0) >= self.scrape_interval:
-            await self.process()
-            return self.scrape_interval
-        else:
-            remaining_time = self.state.get("last_run", 0) + self.scrape_interval - time.time()
-            if remaining_time > 0:
-                log.debug(f"{self.tracker}: Skipping check, next run in {remaining_time / 60:.2f} minutes.")
-            return remaining_time
-
-    async def process(self) -> None:
-        """Main loop to fetch and process notifications."""
+    def _collect_notifiers(self) -> list[Callable[[dict[str, Any], str, str, str], Coroutine[Any, Any, None]]]:
         notifiers: list[Callable[[dict[str, Any], str, str, str], Coroutine[Any, Any, None]]] = []
         telegram_bot_token = config.SETTINGS.get("TELEGRAM_BOT_TOKEN")
         telegram_chat_id = config.SETTINGS.get("TELEGRAM_CHAT_ID")
@@ -150,20 +139,68 @@ class BaseTracker(ABC):
             notifiers.append(send_gotify)
         if ntfy_url and ntfy_topic:
             notifiers.append(send_ntfy)
+        return notifiers
+
+    async def _send_item_notifications(
+        self,
+        item: dict[str, Any],
+        notifiers: list[Callable[[dict[str, Any], str, str, str], Coroutine[Any, Any, None]]],
+    ) -> None:
+        for notifier in notifiers:
+            await notifier(
+                item,
+                self.tracker,
+                self.base_url,
+                item["url"],
+            )
+            await asyncio.sleep(3)
+
+    async def fetch_notifications(self) -> float:
+        if time.time() - self.state.get("last_run", 0) >= self.scrape_interval:
+            await self.process()
+            return self.scrape_interval
+        else:
+            remaining_time = self.state.get("last_run", 0) + self.scrape_interval - time.time()
+            if remaining_time > 0:
+                log.debug(f"{self.tracker}: Skipping check, next run in {remaining_time / 60:.2f} minutes.")
+            return remaining_time
+
+    async def send_test_notification(self) -> bool:
+        """Send one test notification without updating tracker state."""
+        notifiers = self._collect_notifiers()
+        if not notifiers:
+            log.error(f"{self.tracker}: No notification backends are configured.")
+            await self.client.aclose()
+            return False
+
+        try:
+            log.info(f"{self.tracker}: Preparing test item...")
+            item = await self._fetch_test_item()
+            if not item:
+                log.warning(f"{self.tracker}: No message or notification available for test delivery.")
+                return False
+
+            log.info(f"{self.tracker}: Sending test item '{item.get('subject') or item.get('title') or item.get('id')}'...")
+            await self._send_item_notifications(item, notifiers)
+            log.info(f"{self.tracker}: Test notification sent.")
+            return True
+        except Exception as e:
+            log.error(f"{self.tracker}: Error sending test notification: {e}")
+            log.debug("Test notification error details", exc_info=True)
+            return False
+        finally:
+            await self.client.aclose()
+
+    async def process(self) -> None:
+        """Main loop to fetch and process notifications."""
+        notifiers = self._collect_notifiers()
 
         try:
             all_items: list[dict[str, Any]] = await self._fetch_items()
 
             for item in all_items:
                 if not self.first_run:
-                    for notifier in notifiers:
-                        await notifier(
-                            item,
-                            self.tracker,
-                            self.base_url,
-                            item["url"],
-                        )
-                        await asyncio.sleep(3)
+                    await self._send_item_notifications(item, notifiers)
                 await self._ack_item(item)
             self.state["last_run"] = time.time()
             self._save_state()
@@ -177,6 +214,12 @@ class BaseTracker(ABC):
     async def _fetch_items(self) -> list[dict[str, Any]]:
         """Fetch all new items from the tracker."""
         raise NotImplementedError
+
+    async def _fetch_test_item(self) -> Optional[dict[str, Any]]:
+        items = await self._fetch_items()
+        if items:
+            return items[0]
+        return None
 
     @staticmethod
     def _extract_domain_from_cookie(cookie_path: Path) -> str:
