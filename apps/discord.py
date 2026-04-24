@@ -11,7 +11,7 @@ import config
 from utils.console import log
 
 
-DISCORD_EMBED_DESCRIPTION_LIMIT = 4096
+DEFAULT_DISCORD_EMBED_DESCRIPTION_LIMIT = 4096
 DISCORD_TRUNCATION_NOTICE = "\n\n...[truncated]"
 
 
@@ -130,14 +130,15 @@ def trim_discord_description(description: str, notifications_url: str) -> str:
     """
     Trims embed descriptions to Discord's description limit while keeping the action link.
     """
+    description_limit = config.SETTINGS.get("DISCORD_EMBED_DESCRIPTION_LIMIT", DEFAULT_DISCORD_EMBED_DESCRIPTION_LIMIT)
     action_link = f"[Open Notification]({notifications_url})"
     full_description = f"{description}{action_link}"
-    if len(full_description) <= DISCORD_EMBED_DESCRIPTION_LIMIT:
+    if len(full_description) <= description_limit:
         return full_description
 
-    available = DISCORD_EMBED_DESCRIPTION_LIMIT - len(action_link) - len(DISCORD_TRUNCATION_NOTICE)
+    available = description_limit - len(action_link) - len(DISCORD_TRUNCATION_NOTICE)
     if available <= 0:
-        return action_link[:DISCORD_EMBED_DESCRIPTION_LIMIT]
+        return action_link[:description_limit]
 
     trimmed_description = description[:available].rstrip()
     return f"{trimmed_description}{DISCORD_TRUNCATION_NOTICE}{action_link}"
