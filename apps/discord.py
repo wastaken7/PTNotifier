@@ -11,6 +11,10 @@ import config
 from utils.console import log
 
 
+DISCORD_EMBED_DESCRIPTION_LIMIT = 4096
+DISCORD_TRUNCATION_NOTICE = "\n\n...[truncated]"
+
+
 async def get_local_favicon(client: httpx.AsyncClient, icon_url: str, tracker_name: str) -> tuple[Optional[Path], str]:
     """
     Downloads the favicon from a URL, converts it to PNG, and saves it.
@@ -88,7 +92,7 @@ async def send_discord(
             clean_body = format_for_discord(item.get("body", ""))
             description += f"**Body:** {clean_body}\n\n"
 
-        description += f"[Open Notification]({notifications_url})"
+        description = trim_discord_description(description, notifications_url)
 
         embed_icon = f"attachment://{icon_filename}" if icon_path else icon_url
 
@@ -120,6 +124,23 @@ async def send_discord(
         except Exception as e:
             log.error(f"Discord Exception: {e}")
             log.debug("Discord error details", exc_info=True)
+
+
+def trim_discord_description(description: str, notifications_url: str) -> str:
+    """
+    Trims embed descriptions to Discord's description limit while keeping the action link.
+    """
+    action_link = f"[Open Notification]({notifications_url})"
+    full_description = f"{description}{action_link}"
+    if len(full_description) <= DISCORD_EMBED_DESCRIPTION_LIMIT:
+        return full_description
+
+    available = DISCORD_EMBED_DESCRIPTION_LIMIT - len(action_link) - len(DISCORD_TRUNCATION_NOTICE)
+    if available <= 0:
+        return action_link[:DISCORD_EMBED_DESCRIPTION_LIMIT]
+
+    trimmed_description = description[:available].rstrip()
+    return f"{trimmed_description}{DISCORD_TRUNCATION_NOTICE}{action_link}"
 
 
 def format_for_discord(raw_description: str):
