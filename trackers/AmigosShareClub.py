@@ -24,7 +24,6 @@ class AmigosShareClub(BaseTracker):
             base_url="https://cliente.amigos-share.club/",
         )
         self.inbox_url = "https://cliente.amigos-share.club/mensagens.php?do=n_lidas"
-        self.read_inbox_url = "https://cliente.amigos-share.club/mensagens.php"
 
     async def _fetch_items(self) -> list[dict[str, Any]]:
         """Fetch messages from ASC inbox and include their bodies."""
@@ -40,7 +39,7 @@ class AmigosShareClub(BaseTracker):
         if unread_items:
             return unread_items[0]
 
-        read_items = await self._parse_messages(self.read_inbox_url, ignore_processed=True)
+        read_items = await self._parse_messages(urljoin(self.base_url, "mensagens.php"), ignore_processed=True)
         if not read_items:
             return None
 

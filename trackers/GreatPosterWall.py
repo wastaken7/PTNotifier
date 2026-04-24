@@ -24,7 +24,6 @@ class GreatPosterWall(BaseTracker):
             base_url="https://greatposterwall.com/",
         )
         self.inbox_url = urljoin(self.base_url, "inbox.php?sort=unread")
-        self.read_inbox_url = urljoin(self.base_url, "inbox.php")
         self.staff_url = urljoin(self.base_url, "staffpm.php")
 
     async def _fetch_items(self) -> list[dict[str, Any]]:
@@ -38,7 +37,7 @@ class GreatPosterWall(BaseTracker):
         if unread_items:
             return unread_items[0]
 
-        read_items = await self._parse_messages(self.read_inbox_url, is_staff=False, include_read=True, ignore_processed=True)
+        read_items = await self._parse_messages(urljoin(self.base_url, "inbox.php"), is_staff=False, include_read=True, ignore_processed=True)
         if read_items:
             return read_items[0]
 

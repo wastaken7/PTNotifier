@@ -23,7 +23,6 @@ class NexusPHP(BaseTracker):
             **kwargs,
         )
         self.inbox_url = urljoin(self.base_url, "messages.php?action=viewmailbox&box=1&unread=yes")
-        self.read_inbox_url = urljoin(self.base_url, "messages.php?action=viewmailbox&box=1")
 
     async def _fetch_items(self) -> list[dict[str, Any]]:
         inbox_items = await self._parse_messages(self.inbox_url)
@@ -34,7 +33,7 @@ class NexusPHP(BaseTracker):
         if unread_items:
             return unread_items[0]
 
-        read_items = await self._parse_messages(self.read_inbox_url, include_read=True, ignore_processed=True)
+        read_items = await self._parse_messages(urljoin(self.base_url, "messages.php?action=viewmailbox&box=1"), include_read=True, ignore_processed=True)
         if read_items:
             return read_items[0]
 
