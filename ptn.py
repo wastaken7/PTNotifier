@@ -24,9 +24,17 @@ def parse_args() -> argparse.Namespace:
         nargs="?",
         const="__FIRST__",
         metavar="TRACKER",
-        help="Send test notifications. Optionally target a specific tracker module name, e.g. --test-notification UNIT3D",
+        help="Send test notifications. Optionally target one or more trackers, e.g. --test-notification LST,Anthelion",
     )
     return parser.parse_args()
+
+
+def parse_test_notification_targets(raw_target: str | None) -> list[str] | None:
+    if raw_target is None:
+        return None
+
+    targets = [target.strip() for target in raw_target.split(",") if target.strip()]
+    return targets or None
 
 
 def iter_tracker_instances(tracker_classes: dict[str, Any]) -> list[tuple[str, Any]]:
@@ -62,30 +70,30 @@ def iter_tracker_instances(tracker_classes: dict[str, Any]) -> list[tuple[str, A
     return instances
 
 
-async def run_test_notification(tracker_classes: dict[str, Any], target_tracker: str | None) -> int:
+async def run_test_notification(tracker_classes: dict[str, Any], target_trackers: list[str] | None) -> int:
     candidates = iter_tracker_instances(tracker_classes)
-    if target_tracker:
-        normalized_target = target_tracker.lower()
+    if target_trackers:
+        normalized_targets = {target.lower() for target in target_trackers}
         candidates = [
             (tracker_name, tracker_instance)
             for tracker_name, tracker_instance in candidates
-            if normalized_target in {
+            if normalized_targets.intersection({
                 tracker_name.lower(),
                 tracker_instance.tracker.lower(),
                 tracker_instance.__class__.__name__.lower(),
                 getattr(tracker_instance, "domain", "").lower(),
                 Path(getattr(tracker_instance, "filename", "")).stem.lower(),
-            }
+            })
         ]
 
     if not candidates:
-        if target_tracker:
-            log.error(f"No tracker instance found for test notification target: {target_tracker}")
+        if target_trackers:
+            log.error(f"No tracker instance found for test notification target(s): {', '.join(target_trackers)}")
         else:
             log.error("No tracker instances found for test notification.")
         return 1
 
-    if not target_tracker:
+    if not target_trackers:
         tracker_name, tracker_instance = candidates[0]
         log.info(f"Sending test notification using {tracker_name}...")
         success = await tracker_instance.send_test_notification()
@@ -107,8 +115,8 @@ async def main(args: argparse.Namespace):
     tracker_classes = load_trackers()
 
     if args.test_notification is not None:
-        target_tracker = None if args.test_notification == "__FIRST__" else args.test_notification
-        return await run_test_notification(tracker_classes, target_tracker)
+        target_trackers = None if args.test_notification == "__FIRST__" else parse_test_notification_targets(args.test_notification)
+        return await run_test_notification(tracker_classes, target_trackers)
 
     cookies_dir = Path("./cookies")
 
