@@ -156,6 +156,11 @@ class BaseTracker(ABC):
 
             for item in all_items:
                 if not self.first_run:
+                    if self._should_ignore(item):
+                        log.info(f"{self.tracker}: Ignoring notification due to keyword filter.")
+                        await self._ack_item(item)
+                        continue
+
                     for notifier in notifiers:
                         await notifier(
                             item,
@@ -172,6 +177,28 @@ class BaseTracker(ABC):
             log.debug("Processing error details", exc_info=True)
         finally:
             await self.client.aclose()
+
+    def _should_ignore(self, item: dict[str, Any]) -> bool:
+        """Checks if the item contains any ignore keywords for this tracker."""
+        ignore_config: dict[str, list[str]]  = config.SETTINGS.get("IGNORE_STRING", {})
+
+        # Check for both base_url with and without trailing slash
+        url_with_slash = self.base_url if self.base_url.endswith("/") else self.base_url + "/"
+        url_no_slash = self.base_url.rstrip("/")
+
+        keywords = ignore_config.get(url_with_slash) or ignore_config.get(url_no_slash)
+
+        if not keywords:
+            return False
+
+        # Fields to check
+        fields_to_check = [item.get("title"), item.get("subject"), item.get("body")]
+
+        for field in fields_to_check:
+            if field and any(keyword.lower() in str(field).lower() for keyword in keywords):
+                return True
+
+        return False
 
     @abstractmethod
     async def _fetch_items(self) -> list[dict[str, Any]]:

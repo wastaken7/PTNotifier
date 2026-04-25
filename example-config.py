@@ -24,6 +24,14 @@ SETTINGS: dict[str, Any] = {
     # Minimum delay in seconds between requests
     # Default is 5 seconds
     "REQUEST_DELAY": 5.0,
+    # Optional: Specify strings that will cause a notification to be ignored.
+    # The key is the tracker's base URL and the value is a list of strings to ignore.
+    # The check is case-insensitive and matches anywhere in the notification.
+    # Example: If you don't want to be notified about "torrent deleted" or "your class has changed",
+    # you can add them to the ignore list like this:
+    "IGNORE_STRING": {
+        "https://example.com/": ["torrent deleted", "your class has changed"],
+    },
 }
 
 API_TOKENS: dict[str, str] = {

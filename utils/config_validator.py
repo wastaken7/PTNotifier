@@ -24,6 +24,8 @@ def load_config() -> tuple[dict[str, Any], dict[str, str], str | None, str | Non
         gotify_token = user_config.get("GOTIFY_TOKEN")
         ntfy_url = user_config.get("NTFY_URL")
         ntfy_topic = user_config.get("NTFY_TOPIC")
+        if "IGNORE_STRING" not in user_config:
+            user_config["IGNORE_STRING"] = {}
 
     except Exception as e:
         log.error(f"Error loading config.py: {e}")
