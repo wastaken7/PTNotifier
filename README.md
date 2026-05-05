@@ -165,6 +165,7 @@ The first time you run the script, it will create a `config.py` file from `examp
 -   **`TELEGRAM_BOT_TOKEN`**: Your Telegram bot's API token.
 -   **`TELEGRAM_CHAT_ID`**: The ID of the Telegram chat where you want to receive notifications. You can also provide a `TELEGRAM_TOPIC_ID` if you want to send messages to a specific topic in a group.
 -   **`DISCORD_WEBHOOK_URL`**: Your Discord webhook URL.
+-   **`DISCORD_EMBED_DESCRIPTION_LIMIT`**: Maximum Discord embed description length before PTNotifier trims the message. Defaults to `4096`.
 -   **`GOTIFY_URL`**: The URL of your Gotify instance.
 -   **`GOTIFY_TOKEN`**: Your Gotify App token.
 -   **`NTFY_URL`**: The URL of your ntfy instance (e.g. `https://ntfy.sh`).
