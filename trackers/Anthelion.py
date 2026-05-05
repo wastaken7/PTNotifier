@@ -3,7 +3,7 @@
 import json
 import re
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 from urllib.parse import urljoin
 
 import config
@@ -37,7 +37,22 @@ class Anthelion(BaseTracker):
 
         return await self._fetch_inbox()
 
-    async def _fetch_inbox(self) -> list[dict[str, Any]]:
+    async def _fetch_test_item(self) -> Optional[dict[str, Any]]:
+        if not self.api_key:
+            log.warning(f"{self.tracker}: API key not found in config. Skipping...")
+            return None
+
+        unread_items = await self._fetch_inbox()
+        if unread_items:
+            return unread_items[0]
+
+        fallback_items = await self._fetch_inbox(ignore_processed=True)
+        if fallback_items:
+            return fallback_items[0]
+
+        return None
+
+    async def _fetch_inbox(self, ignore_processed: bool = False) -> list[dict[str, Any]]:
         """Parses the inbox API response and returns new message items."""
         new_items: list[dict[str, Any]] = []
         raw_data = await self._fetch_page(self.inbox_api, "messages", success_text='"status": "success"')
@@ -60,7 +75,10 @@ class Anthelion(BaseTracker):
         for msg in messages:
             try:
                 message_id = str(msg.get("message_id", ""))
-                if not message_id or message_id in self.state["processed_ids"]:
+                if not message_id:
+                    continue
+
+                if not ignore_processed and message_id in self.state["processed_ids"]:
                     continue
 
                 conv_id = str(msg.get("conv_id", ""))
@@ -87,7 +105,6 @@ class Anthelion(BaseTracker):
                         "url": link,
                     }
                 )
-                self.state["processed_ids"].append(message_id)
             except Exception as e:
                 log.error(f"{self.tracker}: Failed to process message: {e}")
                 log.debug(f"{self.tracker}: Raw data: {msg}", exc_info=True)

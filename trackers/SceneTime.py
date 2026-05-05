@@ -31,7 +31,18 @@ class SceneTime(BaseTracker):
         inbox_items = await self._parse_messages(self.inbox_url)
         return inbox_items
 
-    async def _parse_messages(self, url: str) -> list[dict[str, Any]]:
+    async def _fetch_test_item(self) -> dict[str, Any] | None:
+        unread_items = await self._fetch_items()
+        if unread_items:
+            return unread_items[0]
+
+        read_items = await self._parse_messages(self.inbox_url, include_read=True, ignore_processed=True)
+        if read_items:
+            return read_items[0]
+
+        return None
+
+    async def _parse_messages(self, url: str, include_read: bool = False, ignore_processed: bool = False) -> list[dict[str, Any]]:
         """Parses the inbox for SceneTime messages and extracts bodies from hidden divs."""
         new_items: list[dict[str, Any]] = []
         response = await self._fetch_page(url, "messages", success_text="request.php")
@@ -45,7 +56,7 @@ class SceneTime(BaseTracker):
         for header in message_headers:
             is_unread = header.get("type") == "unread"
 
-            if not is_unread:
+            if not is_unread and not include_read:
                 continue
 
             item_id = header.get("rel")
@@ -53,7 +64,7 @@ class SceneTime(BaseTracker):
                 continue
             item_id = str(item_id)
 
-            if item_id in self.state["processed_ids"]:
+            if not ignore_processed and item_id in self.state["processed_ids"]:
                 continue
 
             status_li = header.find("li", class_="status_icon")

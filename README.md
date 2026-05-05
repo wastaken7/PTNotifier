@@ -214,6 +214,28 @@ python ptn.py
 
 The script will start, load all trackers with valid cookie files, and begin monitoring. The first run for each tracker will not send any notifications; it will only establish a baseline of existing items.
 
+To send a one-off test notification, use (where TRACKER is the tracker name):
+
+```bash
+python ptn.py --test-notification TRACKER
+```
+
+If you omit the tracker name, PTNotifier will use the first available tracker instance:
+
+```bash
+python ptn.py --test-notification
+```
+
+If you provide a tracker name, PTNotifier will send a test notification for every matching tracker instance. You can target any supported tracker, including API-only trackers that are configured in `config.py`.
+
+You can also pass a comma-separated list to test multiple trackers at once:
+
+```bash
+python ptn.py --test-notification LST,Anthelion
+```
+
+Test mode will fall back to a read message if there are no unread items available.
+
 ### Docker
 
 You can also run PTNotifier in a Docker container. Make sure to set up your `config.py` and cookies as described above, then use the following command:
