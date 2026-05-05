@@ -176,6 +176,14 @@ The first time you run the script, it will create a `config.py` file from `examp
 -   **`MARK_AS_READ`**: (Optional) For some trackers, the script can attempt to mark notifications as read. Set to `True` or `False`.
 -   **`TIMEOUT`**: The timeout in seconds for network requests.
 -   **`REQUEST_DELAY`**: Delay in seconds between requests to avoid being rate-limited.
+-   **`IGNORE_STRING`**: A dictionary that allows you to ignore notifications containing specific keywords for specific trackers. The key should be the tracker's base URL.
+    Example:
+    ```python
+    "IGNORE_STRING": {
+        "https://orpheus.network/": ["keyword1", "keyword2"],
+        "https://anthelion.me/": ["hello world"],
+    }
+    ```
 
 ### 5. Add Tracker Cookies
 

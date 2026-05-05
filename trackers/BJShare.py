@@ -22,7 +22,7 @@ class BJShare(BaseTracker):
             cookie_path,
             tracker_name="BJ-Share",
             base_url="https://bj-share.info/",
-            scrape_interval=3600,
+            scrape_interval=3600,  # Minimum interval for checking messages, set by the site admin. Never change this value.
         )
         self.inbox_url = urljoin(self.base_url, "inbox.php?sort=unread")
         self.staff_url = urljoin(self.base_url, "staffpm.php")
