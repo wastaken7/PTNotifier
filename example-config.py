@@ -4,6 +4,8 @@ SETTINGS: dict[str, Any] = {
     "TELEGRAM_BOT_TOKEN": "",
     "TELEGRAM_CHAT_ID": "",
     "DISCORD_WEBHOOK_URL": "",
+    # Discord embed description limit. Discord currently allows up to 4096 characters.
+    "DISCORD_EMBED_DESCRIPTION_LIMIT": 4096,
     "GOTIFY_URL": "",
     "GOTIFY_TOKEN": "",
     "NTFY_URL": "https://ntfy.sh",

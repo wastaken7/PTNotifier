@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import argparse
 import asyncio
 import glob
 import sys
@@ -16,11 +17,107 @@ from utils.tracker_loader import load_trackers
 user_config, api_tokens, discord_webhook_url, telegram_bot_token, telegram_chat_id, gotify_url, gotify_token, ntfy_url, ntfy_topic = load_config()
 
 
-async def main():
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="PTNotifier")
+    parser.add_argument(
+        "--test-notification",
+        nargs="?",
+        const="__FIRST__",
+        metavar="TRACKER",
+        help="Send test notifications. Optionally target one or more trackers, e.g. --test-notification LST,Anthelion",
+    )
+    return parser.parse_args()
+
+
+def parse_test_notification_targets(raw_target: str | None) -> list[str] | None:
+    if raw_target is None:
+        return None
+
+    targets = [target.strip() for target in raw_target.split(",") if target.strip()]
+    return targets or None
+
+
+def iter_tracker_instances(tracker_classes: dict[str, Any]) -> list[tuple[str, Any]]:
+    cookies_dir = Path("./cookies")
+    instances: list[tuple[str, Any]] = []
+
+    for tracker_name, tracker_class in tracker_classes.items():
+        if getattr(tracker_class, "api_only", False):
+            if not api_tokens.get(tracker_name):
+                continue
+
+            tracker_instance = tracker_class(Path("./cookies") / f"{tracker_name}.txt")
+            instances.append((tracker_name, tracker_instance))
+            continue
+
+        search_patterns = [
+            cookies_dir / tracker_name.upper() / "*.txt",
+            cookies_dir / tracker_name / "*.txt",
+            cookies_dir / "Other" / f"{tracker_name}.txt",
+        ]
+
+        seen_files: set[Path] = set()
+        for pattern in search_patterns:
+            for cookie_file in glob.glob(str(pattern)):
+                path_obj = Path(cookie_file)
+                if path_obj in seen_files:
+                    continue
+
+                tracker_instance = tracker_class(path_obj)
+                instances.append((tracker_name, tracker_instance))
+                seen_files.add(path_obj)
+
+    return instances
+
+
+async def run_test_notification(tracker_classes: dict[str, Any], target_trackers: list[str] | None) -> int:
+    candidates = iter_tracker_instances(tracker_classes)
+    if target_trackers:
+        normalized_targets = {target.lower() for target in target_trackers}
+        candidates = [
+            (tracker_name, tracker_instance)
+            for tracker_name, tracker_instance in candidates
+            if normalized_targets.intersection({
+                tracker_name.lower(),
+                tracker_instance.tracker.lower(),
+                tracker_instance.__class__.__name__.lower(),
+                getattr(tracker_instance, "domain", "").lower(),
+                Path(getattr(tracker_instance, "filename", "")).stem.lower(),
+            })
+        ]
+
+    if not candidates:
+        if target_trackers:
+            log.error(f"No tracker instance found for test notification target(s): {', '.join(target_trackers)}")
+        else:
+            log.error("No tracker instances found for test notification.")
+        return 1
+
+    if not target_trackers:
+        tracker_name, tracker_instance = candidates[0]
+        log.info(f"Sending test notification using {tracker_name}...")
+        success = await tracker_instance.send_test_notification()
+        return 0 if success else 1
+
+    overall_success = True
+    for tracker_name, tracker_instance in candidates:
+        log.info(f"Sending test notification using {tracker_name}...")
+        success = await tracker_instance.send_test_notification()
+        overall_success = overall_success and success
+
+    return 0 if overall_success else 1
+
+
+async def main(args: argparse.Namespace):
     """
     Main execution function that initializes trackers and runs the monitoring loop.
     """
     tracker_classes = load_trackers()
+
+    if args.test_notification is not None:
+        target_trackers = None if args.test_notification == "__FIRST__" else parse_test_notification_targets(args.test_notification)
+        return await run_test_notification(tracker_classes, target_trackers)
+
     cookies_dir = Path("./cookies")
 
     while True:
@@ -117,6 +214,7 @@ async def main():
 
 if __name__ == "__main__":
     try:
-        asyncio.run(main())
+        args = parse_args()
+        raise SystemExit(asyncio.run(main(args)))
     except KeyboardInterrupt:
         log.info("PTNotifier stopped by user.")

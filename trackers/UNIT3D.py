@@ -135,13 +135,13 @@ class UNIT3D(BaseTracker):
             )
         return items
 
-    def _parse_messages_html(self, soup: BeautifulSoup) -> list[dict[str, Any]]:
+    def _parse_messages_html(self, soup: BeautifulSoup, include_read: bool = False, ignore_processed: bool = False) -> list[dict[str, Any]]:
         items: list[dict[str, Any]] = []
         rows = soup.find_all("tr")
 
         for row in rows:
             unread_icon = row.find("i", class_="text-red")
-            if not unread_icon:
+            if not unread_icon and not include_read:
                 continue
 
             cols = row.find_all("td")
@@ -158,6 +158,8 @@ class UNIT3D(BaseTracker):
             if isinstance(msg_url, list):
                 msg_url = msg_url[0]
             msg_id = f"msg_{str(msg_url).rstrip('/').split('/')[-1]}"
+            if not ignore_processed and msg_id in self.state["processed_ids"]:
+                continue
 
             items.append(
                 {
@@ -170,6 +172,11 @@ class UNIT3D(BaseTracker):
                 }
             )
         return items
+
+    async def _populate_message_body(self, item: dict[str, Any]) -> dict[str, Any]:
+        if item["type"] == "message":
+            item["body"] = await self._fetch_body(item["url"])
+        return item
 
     async def _fetch_body(self, url: str) -> str:
         """
@@ -218,10 +225,25 @@ class UNIT3D(BaseTracker):
         all_items = notifs + msgs
 
         for item in all_items:
-            if item["type"] == "message":
-                item["body"] = await self._fetch_body(item["url"])
+            await self._populate_message_body(item)
 
         return all_items
+
+    async def _fetch_test_item(self) -> Optional[dict[str, Any]]:
+        unread_items = await self._fetch_items()
+        if unread_items:
+            return unread_items[0]
+
+        await self.initialize()
+        read_messages = await self._fetch_and_parse(
+            self.messages_url,
+            lambda soup: self._parse_messages_html(soup, include_read=True, ignore_processed=True),
+            "messages",
+        )
+        if not read_messages:
+            return None
+
+        return await self._populate_message_body(read_messages[0])
 
     async def _ack_item(self, item: dict[str, Any]) -> None:
         """Marks an item as processed and read on the site."""

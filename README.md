@@ -165,6 +165,7 @@ The first time you run the script, it will create a `config.py` file from `examp
 -   **`TELEGRAM_BOT_TOKEN`**: Your Telegram bot's API token.
 -   **`TELEGRAM_CHAT_ID`**: The ID of the Telegram chat where you want to receive notifications. You can also provide a `TELEGRAM_TOPIC_ID` if you want to send messages to a specific topic in a group.
 -   **`DISCORD_WEBHOOK_URL`**: Your Discord webhook URL.
+-   **`DISCORD_EMBED_DESCRIPTION_LIMIT`**: Maximum Discord embed description length before PTNotifier trims the message. Defaults to `4096`.
 -   **`GOTIFY_URL`**: The URL of your Gotify instance.
 -   **`GOTIFY_TOKEN`**: Your Gotify App token.
 -   **`NTFY_URL`**: The URL of your ntfy instance (e.g. `https://ntfy.sh`).
@@ -220,6 +221,28 @@ python ptn.py
 ```
 
 The script will start, load all trackers with valid cookie files, and begin monitoring. The first run for each tracker will not send any notifications; it will only establish a baseline of existing items.
+
+To send a one-off test notification, use (where TRACKER is the tracker name):
+
+```bash
+python ptn.py --test-notification TRACKER
+```
+
+If you omit the tracker name, PTNotifier will use the first available tracker instance:
+
+```bash
+python ptn.py --test-notification
+```
+
+If you provide a tracker name, PTNotifier will send a test notification for every matching tracker instance. You can target any supported tracker, including API-only trackers that are configured in `config.py`.
+
+You can also pass a comma-separated list to test multiple trackers at once:
+
+```bash
+python ptn.py --test-notification LST,Anthelion
+```
+
+Test mode will fall back to a read message if there are no unread items available.
 
 ### Docker
 

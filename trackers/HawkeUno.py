@@ -62,7 +62,7 @@ class HawkeUno(UNIT3D):
             )
         return items
 
-    def _parse_messages_html(self, soup: BeautifulSoup) -> list[dict[str, Any]]:
+    def _parse_messages_html(self, soup: BeautifulSoup, include_read: bool = False, ignore_processed: bool = False) -> list[dict[str, Any]]:
         self._discover_username(soup)
         username = self.state.get("username", "me")
 
@@ -80,6 +80,10 @@ class HawkeUno(UNIT3D):
 
             wire_key = row.get("wire:key", "")
             correspondent_id = wire_key.split("-")[-1] if "-" in wire_key else ""
+            item_id = f"msg_{correspondent_id}"
+
+            if not ignore_processed and item_id in self.state["processed_ids"]:
+                continue
 
             msg_url = f"https://hawke.uno/users/{username}/hub/messages"
             if correspondent_id:
@@ -88,7 +92,7 @@ class HawkeUno(UNIT3D):
             items.append(
                 {
                     "type": "message",
-                    "id": f"msg_{correspondent_id}",
+                    "id": item_id,
                     "sender": sender,
                     "subject": subject,
                     "date": row.find("span", class_="deep-space-messages__row-time").get_text(strip=True),

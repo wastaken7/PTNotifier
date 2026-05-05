@@ -28,7 +28,18 @@ class NexusPHP(BaseTracker):
         inbox_items = await self._parse_messages(self.inbox_url)
         return inbox_items
 
-    async def _parse_messages(self, url: str) -> list[dict[str, Any]]:
+    async def _fetch_test_item(self) -> dict[str, Any] | None:
+        unread_items = await self._fetch_items()
+        if unread_items:
+            return unread_items[0]
+
+        read_items = await self._parse_messages(urljoin(self.base_url, "messages.php?action=viewmailbox&box=1"), include_read=True, ignore_processed=True)
+        if read_items:
+            return read_items[0]
+
+        return None
+
+    async def _parse_messages(self, url: str, include_read: bool = False, ignore_processed: bool = False) -> list[dict[str, Any]]:
         new_items: list[dict[str, Any]] = []
         response = await self._fetch_page(url, "messages", success_text="torrents.php")
         soup = BeautifulSoup(response, "html.parser")
@@ -51,7 +62,7 @@ class NexusPHP(BaseTracker):
 
         for row in rows:
             unread_img = row.find("img", class_="unreadpm")
-            if not unread_img:
+            if not unread_img and not include_read:
                 continue
 
             cells = row.find_all("td", class_="rowfollow")
@@ -65,7 +76,7 @@ class NexusPHP(BaseTracker):
             msg_url = urljoin(self.base_url, str(link_tag["href"]))
             item_id = msg_url.split("id=")[-1]
 
-            if item_id in self.state["processed_ids"]:
+            if not ignore_processed and item_id in self.state["processed_ids"]:
                 continue
 
             subject = link_tag.get_text(strip=True)
