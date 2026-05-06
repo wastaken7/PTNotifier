@@ -37,6 +37,7 @@ These are specific trackers that have their own dedicated module. The cookie fil
 | `AvistaZ.py` | - | - | This includes AvistaZ, CinemaZ, PrivateHD, ExoticaZ.|
 | `AmigosShareClub.py` | `cliente.amigos-share.club`| `AmigosShareClub.txt` | - |
 | `Anthelion.py` | `anthelion.me` | - | API Key required in config.py |
+| `Baozi.py` | `p.t-baozi.cc` | `Baozi.txt` | - |
 | `BJShare.py` | `bj-share.info`| `BJShare.txt` | - |
 | `BrasilTracker.py` | `brasiltracker.org` | `BrasilTracker.txt` | - |
 | `BTSCHOOL.py` | `pt.btschool.club`| `BTSCHOOL.txt` | - |
