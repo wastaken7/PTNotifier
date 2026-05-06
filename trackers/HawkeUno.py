@@ -16,6 +16,12 @@ class HawkeUno(UNIT3D):
         super().__init__(cookie_path)
 
     def _discover_username(self, soup: BeautifulSoup):
+        """
+        Discover the username from the page content.
+
+        Args:
+            soup (BeautifulSoup): The page content.
+        """
         if self.state.get("username"):
             return
 
@@ -25,6 +31,15 @@ class HawkeUno(UNIT3D):
             self.state["username"] = username
 
     def _parse_notifications_html(self, soup: BeautifulSoup) -> list[dict[str, Any]]:
+        """
+        Parse notifications from HTML.
+
+        Args:
+            soup (BeautifulSoup): The page content.
+
+        Returns:
+            list[dict[str, Any]]: List of notifications.
+        """
         self._discover_username(soup)
 
         unread_rows = soup.find_all("tr", class_="ds-macro-row--unread")
@@ -40,12 +55,12 @@ class HawkeUno(UNIT3D):
                 continue
 
             title = link_tag.get_text(strip=True)
-            url = link_tag.get("href", "")
+            url = str(link_tag.get("href", ""))
 
             cols = row.find_all("td")
             date_text = cols[1].get_text(strip=True) if len(cols) > 1 else ""
 
-            wire_key = row.get("wire:key", "")
+            wire_key = str(row.get("wire:key", ""))
             notif_id = wire_key if wire_key else f"notif_{hash(title)}"
 
             if notif_id in self.state["processed_ids"]:
@@ -63,6 +78,18 @@ class HawkeUno(UNIT3D):
         return items
 
     def _parse_messages_html(self, soup: BeautifulSoup, include_read: bool = False, ignore_processed: bool = False) -> list[dict[str, Any]]:
+        """
+        Parse messages from HTML.
+
+        Args:
+            soup (BeautifulSoup): The page content.
+            _: Unused parameter (for API compliance).
+            ignore_processed (bool): Whether to ignore processed messages.
+
+        Returns:
+            list[dict[str, Any]]: List of messages.
+        """
+        _ = include_read
         self._discover_username(soup)
         username = self.state.get("username", "me")
 
@@ -78,7 +105,7 @@ class HawkeUno(UNIT3D):
             preview_tag = row.find("div", class_="deep-space-messages__row-preview")
             subject = preview_tag.get_text(strip=True) if preview_tag else "New Message"
 
-            wire_key = row.get("wire:key", "")
+            wire_key = str(row.get("wire:key", ""))
             correspondent_id = wire_key.split("-")[-1] if "-" in wire_key else ""
             item_id = f"msg_{correspondent_id}"
 
@@ -89,13 +116,16 @@ class HawkeUno(UNIT3D):
             if correspondent_id:
                 msg_url += f"?activeCorrespondentId={correspondent_id}"
 
+            time_tag = row.find("span", class_="deep-space-messages__row-time")
+            date_text = time_tag.get_text(strip=True) if time_tag else ""
+
             items.append(
                 {
                     "type": "message",
                     "id": item_id,
                     "sender": sender,
                     "subject": subject,
-                    "date": row.find("span", class_="deep-space-messages__row-time").get_text(strip=True),
+                    "date": date_text,
                     "url": msg_url,
                 }
             )

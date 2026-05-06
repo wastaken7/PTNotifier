@@ -29,13 +29,23 @@ class DigitalCore(BaseTracker):
         self.notifications_api = urljoin(self.base_url, "/api/v1/notifications?index=0&limit=20&toReturn=all")
 
     async def _fetch_items(self) -> list[dict[str, Any]]:
-        """Fetch messages and notifications from DigitalCore API."""
+        """
+        Fetch messages and notifications from DigitalCore API.
+
+        Returns:
+            list[dict[str, Any]]: List of items.
+        """
         mailbox_items = await self._fetch_mailbox()
         notification_items = await self._fetch_notifications()
         return mailbox_items + notification_items
 
     async def _fetch_mailbox(self) -> list[dict[str, Any]]:
-        """Parses the mailbox API response."""
+        """
+        Parses the mailbox API response.
+
+        Returns:
+            list[dict[str, Any]]: List of items.
+        """
         new_items: list[dict[str, Any]] = []
         data = await self._fetch_page(self.mailbox_api, "messages")
         if not data:
@@ -76,7 +86,12 @@ class DigitalCore(BaseTracker):
         return new_items
 
     async def _fetch_notifications(self) -> list[dict[str, Any]]:
-        """Parses the notifications API response."""
+        """
+        Parses the notifications API response.
+
+        Returns:
+            list[dict[str, Any]]: List of items.
+        """
         new_items: list[dict[str, Any]] = []
         data = await self._fetch_page(self.mailbox_api, "notifications")
 

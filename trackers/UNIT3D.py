@@ -40,6 +40,11 @@ class UNIT3D(BaseTracker):
         self.csrf_token: Optional[str] = self.state.get("csrf_token")
 
     async def initialize(self):
+        """Initializes the tracker session.
+
+        Returns:
+            None
+        """
         if not self.domain:
             log.error(f"Initialization failed: Could not determine domain from cookies.: {self.cookie_path}")
             return
@@ -83,6 +88,14 @@ class UNIT3D(BaseTracker):
             self._save_state()
 
     def _make_absolute_url(self, href: str) -> str:
+        """Makes a URL absolute.
+
+        Args:
+            href (str): The URL to make absolute.
+
+        Returns:
+            str: The absolute URL.
+        """
         if href.startswith("http"):
             return href
         return f"{self.base_url.rstrip('/')}/{href.lstrip('/')}"
@@ -93,6 +106,16 @@ class UNIT3D(BaseTracker):
         parse_func: Callable[[BeautifulSoup], list[dict[str, Any]]],
         request_type: str,
     ) -> list[dict[str, Any]]:
+        """Fetches and parses a page.
+
+        Args:
+            url (str): The URL to fetch.
+            parse_func (Callable[[BeautifulSoup], list[dict[str, Any]]]): The function to parse the page.
+            request_type (str): The type of request.
+
+        Returns:
+            list[dict[str, Any]]: List of items.
+        """
         if not url:
             return []
         response = await self._fetch_page(url, request_type, success_text="/notifications")
@@ -102,6 +125,14 @@ class UNIT3D(BaseTracker):
         return []
 
     def _parse_notifications_html(self, soup: BeautifulSoup) -> list[dict[str, Any]]:
+        """Parses the notifications table for UNIT3D based trackers.
+
+        Args:
+            soup (BeautifulSoup): The soup object.
+
+        Returns:
+            list[dict[str, Any]]: List of notifications.
+        """
         unread_cells = soup.find_all("td", class_="notification--unread")
 
         items: list[dict[str, Any]] = []
@@ -136,6 +167,16 @@ class UNIT3D(BaseTracker):
         return items
 
     def _parse_messages_html(self, soup: BeautifulSoup, include_read: bool = False, ignore_processed: bool = False) -> list[dict[str, Any]]:
+        """Parses the messages table for UNIT3D based trackers.
+
+        Args:
+            soup (BeautifulSoup): The soup object.
+            include_read (bool): Whether to include read messages.
+            ignore_processed (bool): Whether to ignore processed messages.
+
+        Returns:
+            list[dict[str, Any]]: List of messages.
+        """
         items: list[dict[str, Any]] = []
         rows = soup.find_all("tr")
 
@@ -174,13 +215,26 @@ class UNIT3D(BaseTracker):
         return items
 
     async def _populate_message_body(self, item: dict[str, Any]) -> dict[str, Any]:
+        """Populates the message body for a specific message.
+
+        Args:
+            item (dict[str, Any]): The message item.
+
+        Returns:
+            dict[str, Any]: The message item with the body populated.
+        """
         if item["type"] == "message":
             item["body"] = await self._fetch_body(item["url"])
         return item
 
     async def _fetch_body(self, url: str) -> str:
-        """
-        Fetches the content of the last message/comment from a specific page.
+        """Fetches the content of the last message/comment from a specific page.
+
+        Args:
+            url (str): The URL to parse.
+
+        Returns:
+            str: The body of the message.
         """
         try:
             response = await self._fetch_page(url, "item body")
@@ -196,6 +250,14 @@ class UNIT3D(BaseTracker):
         return ""
 
     async def _mark_as_read(self, item: dict[str, Any]) -> bool:
+        """Marks an item as read.
+
+        Args:
+            item (dict[str, Any]): The item to mark as read.
+
+        Returns:
+            bool: True if the item was marked as read, False otherwise.
+        """
         if item["type"] == "message":
             return True
 
@@ -216,7 +278,11 @@ class UNIT3D(BaseTracker):
             return False
 
     async def _fetch_items(self) -> list[dict[str, Any]]:
-        """Fetch all new items from the tracker and populate their bodies."""
+        """Fetch all new items from the tracker and populate their bodies.
+
+        Returns:
+            list[dict[str, Any]]: List of items.
+        """
         await self.initialize()
 
         notifs = await self._fetch_and_parse(self.notifications_url, self._parse_notifications_html, "notifications")
@@ -230,6 +296,11 @@ class UNIT3D(BaseTracker):
         return all_items
 
     async def _fetch_test_item(self) -> Optional[dict[str, Any]]:
+        """Fetches a test item from the tracker.
+
+        Returns:
+            Optional[dict[str, Any]]: The test item.
+        """
         unread_items = await self._fetch_items()
         if unread_items:
             return unread_items[0]
@@ -246,6 +317,13 @@ class UNIT3D(BaseTracker):
         return await self._populate_message_body(read_messages[0])
 
     async def _ack_item(self, item: dict[str, Any]) -> None:
-        """Marks an item as processed and read on the site."""
+        """Marks an item as processed and read on the site.
+
+        Args:
+            item (dict[str, Any]): The item to mark as read.
+
+        Returns:
+            None
+        """
         await self._mark_as_read(item)
         await super()._ack_item(item)

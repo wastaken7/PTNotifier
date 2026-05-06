@@ -13,8 +13,16 @@ async def send_gotify(
     _base_url: str,
     notifications_url: str,
 ) -> None:
-    """
-    Sends a formatted notification to Gotify.
+    """Sends a formatted notification to Gotify.
+
+    Args:
+        item (dict[str, Any]): The item to send.
+        tracker_name (str): The name of the tracker.
+        _base_url (str): The base URL of the tracker.
+        notifications_url (str): The URL to the notifications page.
+
+    Returns:
+        None
     """
     gotify_url: str = config.SETTINGS.get("GOTIFY_URL", "").rstrip("/")
     gotify_token: str = config.SETTINGS.get("GOTIFY_TOKEN", "")
@@ -69,8 +77,13 @@ async def send_gotify(
 
 
 def format_for_gotify(raw_description: str) -> str:
-    """
-    Converts BBCode and HTML to Markdown suitable for Gotify.
+    """Converts BBCode and HTML to Markdown suitable for Gotify.
+
+    Args:
+        raw_description (str): The raw description to convert.
+
+    Returns:
+        str: The converted description.
     """
     # Bold
     raw_description = re.sub(r"\[b\](.*?)\[/b\]|<b>(.*?)</b>|<strong>(.*?)</strong>", r"**\1\2\3**", raw_description, flags=re.IGNORECASE)

@@ -7,7 +7,12 @@ from utils.console import log
 
 
 def load_trackers() -> dict[str, Any]:
-    """Dynamically loads all tracker classes from the 'trackers' directory."""
+    """
+    Dynamically loads all tracker classes from the 'trackers' directory.
+
+    Returns:
+        dict[str, Any]: A dictionary mapping tracker names to their class objects.
+    """
     log.debug("Loading trackers...")
     trackers: dict[str, Any] = {}
     tracker_modules = pkgutil.iter_modules([str(Path("trackers"))])

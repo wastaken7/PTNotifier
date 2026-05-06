@@ -30,7 +30,12 @@ class Anthelion(BaseTracker):
         self.inbox_api = f"{self.base_url}api.php?action=inbox&api_key={self.api_key}"
 
     async def _fetch_items(self) -> list[dict[str, Any]]:
-        """Fetch messages from the Anthelion API."""
+        """
+        Fetch messages from the Anthelion API.
+
+        Returns:
+            list[dict[str, Any]]: List of messages with their bodies.
+        """
         if not self.api_key:
             log.warning(f"{self.tracker}: API key not found in config. Skipping...")
             return []
@@ -38,6 +43,12 @@ class Anthelion(BaseTracker):
         return await self._fetch_inbox()
 
     async def _fetch_test_item(self) -> Optional[dict[str, Any]]:
+        """
+        Fetch a single test item (the first unread message or first read message if no unread).
+
+        Returns:
+            dict[str, Any] | None: The test item with its body, or None if no items are found.
+        """
         if not self.api_key:
             log.warning(f"{self.tracker}: API key not found in config. Skipping...")
             return None
@@ -53,7 +64,15 @@ class Anthelion(BaseTracker):
         return None
 
     async def _fetch_inbox(self, ignore_processed: bool = False) -> list[dict[str, Any]]:
-        """Parses the inbox API response and returns new message items."""
+        """
+        Fetches the inbox API response and returns new message items.
+
+        Args:
+            ignore_processed (bool): Whether to ignore processed messages.
+
+        Returns:
+            list[dict[str, Any]]: List of messages.
+        """
         new_items: list[dict[str, Any]] = []
         raw_data = await self._fetch_page(self.inbox_api, "messages", success_text='"status": "success"')
         if not raw_data:

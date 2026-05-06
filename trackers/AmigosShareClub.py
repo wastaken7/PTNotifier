@@ -26,7 +26,12 @@ class AmigosShareClub(BaseTracker):
         self.inbox_url = "https://cliente.amigos-share.club/mensagens.php?do=n_lidas"
 
     async def _fetch_items(self) -> list[dict[str, Any]]:
-        """Fetch messages from ASC inbox and include their bodies."""
+        """
+        Fetch messages from ASC inbox and include their bodies.
+
+        Returns:
+            list[dict[str, Any]]: List of messages with their bodies.
+        """
         inbox_items: list[dict[str, Any]] = await self._parse_messages(self.inbox_url)
 
         for item in inbox_items:
@@ -35,6 +40,12 @@ class AmigosShareClub(BaseTracker):
         return inbox_items
 
     async def _fetch_test_item(self) -> dict[str, Any] | None:
+        """
+        Fetch a single test item (the first unread message or first read message if no unread).
+
+        Returns:
+            dict[str, Any] | None: The test item with its body, or None if no items are found.
+        """
         unread_items = await self._fetch_items()
         if unread_items:
             return unread_items[0]
@@ -49,6 +60,12 @@ class AmigosShareClub(BaseTracker):
     async def _fetch_body(self, message_id: str) -> str:
         """
         Fetches the message body using the internal search API (JSON response)
+
+        Args:
+            message_id (str): The ID of the message to fetch the body for.
+
+        Returns:
+            str: The body of the message, or an error message if something goes wrong.
         """
         payload = {"mp": message_id, "type": "entrada"}
 
@@ -94,7 +111,16 @@ class AmigosShareClub(BaseTracker):
             return "Error retrieving content."
 
     async def _parse_messages(self, url: str, ignore_processed: bool = False) -> list[dict[str, Any]]:
-        """Parses the inbox for ASC messages."""
+        """
+        Parses the inbox for ASC messages.
+
+        Args:
+            url (str): The URL of the inbox to parse.
+            ignore_processed (bool): Whether to ignore processed messages.
+
+        Returns:
+            list[dict[str, Any]]: List of messages.
+        """
         new_items: list[dict[str, Any]] = []
         response = await self._fetch_page(url, "messages", success_text="Reputação")
         soup = BeautifulSoup(response, "html.parser")

@@ -72,6 +72,12 @@ class BaseTracker(ABC):
     def get_tracker_name(self, tracker_name: str) -> str:
         """
         Returns a clean tracker name from the provided string.
+
+        Args:
+            tracker_name (str): The tracker name to clean.
+
+        Returns:
+            str: The cleaned tracker name.
         """
         tracker_name = tracker_name.replace("https://", "").replace("http://", "")
         if "." in tracker_name:
@@ -82,6 +88,12 @@ class BaseTracker(ABC):
     def get_scrape_interval(self, scrape_interval: float) -> float:
         """
         Returns the scrape interval, ensuring it is not lower than the global setting.
+
+        Args:
+            scrape_interval (float): The scrape interval to use.
+
+        Returns:
+            float: The scrape interval, or the global setting if it is lower.
         """
         config_interval = float(str(config.SETTINGS.get("SCRAPE_INTERVAL", 1800)))
         if scrape_interval >= config_interval:
@@ -90,6 +102,12 @@ class BaseTracker(ABC):
             return config_interval
 
     def _load_state(self) -> dict[str, Any]:
+        """
+        Load state from the state file.
+
+        Returns:
+            dict[str, Any]: The state, or an empty state if the file doesn't exist or is invalid.
+        """
         if self.state_path.exists():
             try:
                 state = json.loads(self.state_path.read_text("utf-8"))
@@ -106,6 +124,9 @@ class BaseTracker(ABC):
             return self.state
 
     def _save_state(self):
+        """
+        Save state to the state file.
+        """
         try:
             self.state_path.parent.mkdir(parents=True, exist_ok=True)
             self.state_path.write_text(json.dumps(self.state, ensure_ascii=False, indent=2), "utf-8")
@@ -114,7 +135,12 @@ class BaseTracker(ABC):
             log.debug("State error details", exc_info=True)
 
     async def _ack_item(self, item: dict[str, Any]) -> None:
-        """Marks an item as processed."""
+        """
+        Marks an item as processed.
+
+        Args:
+            item (dict[str, Any]): The item to mark as processed.
+        """
         item_id = str(item["id"])
         if item_id not in self.state["processed_ids"]:
             self.state["processed_ids"].append(item_id)
@@ -122,6 +148,12 @@ class BaseTracker(ABC):
                 self.state["processed_ids"] = self.state["processed_ids"][-300:]
 
     def _collect_notifiers(self) -> list[Callable[[dict[str, Any], str, str, str], Coroutine[Any, Any, None]]]:
+        """
+        Collects all enabled notifiers from the configuration.
+
+        Returns:
+            list[Callable[[dict[str, Any], str, str, str], Coroutine[Any, Any, None]]]: List of notifier functions.
+        """
         notifiers: list[Callable[[dict[str, Any], str, str, str], Coroutine[Any, Any, None]]] = []
         telegram_bot_token = config.SETTINGS.get("TELEGRAM_BOT_TOKEN")
         telegram_chat_id = config.SETTINGS.get("TELEGRAM_CHAT_ID")
@@ -146,6 +178,13 @@ class BaseTracker(ABC):
         item: dict[str, Any],
         notifiers: list[Callable[[dict[str, Any], str, str, str], Coroutine[Any, Any, None]]],
     ) -> None:
+        """
+        Sends the item to all enabled notifiers.
+
+        Args:
+            item (dict[str, Any]): The item to send.
+            notifiers (list[Callable[[dict[str, Any], str, str, str], Coroutine[Any, Any, None]]]): List of notifier functions.
+        """
         for notifier in notifiers:
             await notifier(
                 item,
@@ -156,6 +195,12 @@ class BaseTracker(ABC):
             await asyncio.sleep(3)
 
     async def fetch_notifications(self) -> float:
+        """
+        Fetch notifications from the tracker, respecting the scrape interval.
+
+        Returns:
+            float: The time until the next run, or 0 if the tracker was just processed.
+        """
         if time.time() - self.state.get("last_run", 0) >= self.scrape_interval:
             await self.process()
             return self.scrape_interval
@@ -166,7 +211,12 @@ class BaseTracker(ABC):
             return remaining_time
 
     async def send_test_notification(self) -> bool:
-        """Send one test notification without updating tracker state."""
+        """
+        Send one test notification without updating tracker state.
+
+        Returns:
+            bool: True if the test notification was sent successfully, False otherwise.
+        """
         notifiers = self._collect_notifiers()
         if not notifiers:
             log.error(f"{self.tracker}: No notification backends are configured.")
@@ -192,7 +242,9 @@ class BaseTracker(ABC):
             await self.client.aclose()
 
     async def process(self) -> None:
-        """Main loop to fetch and process notifications."""
+        """
+        Main loop to fetch and process notifications.
+        """
         notifiers = self._collect_notifiers()
 
         try:
@@ -215,7 +267,15 @@ class BaseTracker(ABC):
             await self.client.aclose()
 
     def _should_ignore(self, item: dict[str, Any]) -> bool:
-        """Checks if the item contains any ignore keywords for this tracker."""
+        """
+        Checks if the item contains any ignore keywords for this tracker.
+
+        Args:
+            item (dict[str, Any]): The item to check.
+
+        Returns:
+            bool: True if the item should be ignored, False otherwise.
+        """
         ignore_config: dict[str, list[str]]  = config.SETTINGS.get("IGNORE_STRING", {})
 
         # Check for both base_url with and without trailing slash
@@ -230,18 +290,25 @@ class BaseTracker(ABC):
         # Fields to check
         fields_to_check = [item.get("title"), item.get("subject"), item.get("body")]
 
-        for field in fields_to_check:
-            if field and any(keyword.lower() in str(field).lower() for keyword in keywords):
-                return True
-
-        return False
+        return any(field and any(keyword.lower() in str(field).lower() for keyword in keywords) for field in fields_to_check)
 
     @abstractmethod
     async def _fetch_items(self) -> list[dict[str, Any]]:
-        """Fetch all new items from the tracker."""
+        """
+        Fetch all new items from the tracker.
+
+        Returns:
+            list[dict[str, Any]]: List of items.
+        """
         raise NotImplementedError
 
     async def _fetch_test_item(self) -> Optional[dict[str, Any]]:
+        """
+        Fetch one test item from the tracker.
+
+        Returns:
+            Optional[dict[str, Any]]: Test item, or None if not found.
+        """
         items = await self._fetch_items()
         if items:
             return items[0]
@@ -249,6 +316,12 @@ class BaseTracker(ABC):
         return await self._fetch_processed_test_item()
 
     async def _fetch_processed_test_item(self) -> Optional[dict[str, Any]]:
+        """
+        Fetch one test item from the tracker, including processed items.
+
+        Returns:
+            Optional[dict[str, Any]]: Test item, or None if not found.
+        """
         original_processed_ids = list(self.state.get("processed_ids", []))
 
         try:
@@ -265,7 +338,15 @@ class BaseTracker(ABC):
 
     @staticmethod
     def _extract_domain_from_cookie(cookie_path: Path) -> str:
-        """Reads the first valid domain from the Netscape cookie file."""
+        """
+        Reads the first valid domain from the Netscape cookie file.
+
+        Args:
+            cookie_path (Path): The path to the cookie file.
+
+        Returns:
+            str: The first valid domain found in the cookie file, or an empty string if not found.
+        """
         try:
             with open(cookie_path, encoding="utf-8") as f:
                 for line in f:
@@ -289,12 +370,17 @@ class BaseTracker(ABC):
         """
         Fetches a page with a global rate limit and optional validation.
 
-        :param url: The URL to fetch.
-        :param request_type: A descriptive name for the request (used for logging).
-        :param success_text: A keyword to look for in the response to verify a successful login/session.
-        :return: The response text.
-        :raises RequestError: If the request fails or validation fails.
-        :raises ValueError: If inputs are invalid.
+        Args:
+            url (str): The URL to fetch.
+            request_type (str): A descriptive name for the request (used for logging).
+            success_text (str): A keyword to look for in the response to verify a successful login/session.
+
+        Returns:
+            str: The response text.
+
+        Raises:
+            RequestError: If the request fails or validation fails.
+            ValueError: If inputs are invalid.
         """
         try:
             delay = float(config.SETTINGS.get("REQUEST_DELAY", 5.0))

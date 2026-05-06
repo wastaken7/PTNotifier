@@ -4,6 +4,21 @@ from utils.console import log
 
 
 def load_config() -> tuple[dict[str, Any], dict[str, str], str | None, str | None, str | None, str | None, str | None, str | None, str | None]:
+    """
+    Load configuration from config.py.
+
+    Returns:
+        tuple: A tuple containing:
+            - user_config (dict[str, Any]): User configuration settings.
+            - api_tokens (dict[str, str]): API tokens for trackers.
+            - discord_webhook_url (str | None): Discord webhook URL.
+            - telegram_bot_token (str | None): Telegram bot token.
+            - telegram_chat_id (str | None): Telegram chat ID.
+            - gotify_url (str | None): Gotify URL.
+            - gotify_token (str | None): Gotify token.
+            - ntfy_url (str | None): Ntfy URL.
+            - ntfy_topic (str | None): Ntfy topic.
+    """
     try:
         import config as _imported_config
     except ImportError:

@@ -26,11 +26,22 @@ class ImmortalSeed(BaseTracker):
         self.inbox_url = urljoin(self.base_url, "messages.php")
 
     async def _fetch_items(self) -> list[dict[str, Any]]:
-        """Fetch messages from ImmortalSeed inbox."""
+        """Fetch messages from ImmortalSeed inbox.
+
+        Returns:
+            list[dict[str, Any]]: List of messages.
+        """
         return await self._parse_messages(self.inbox_url)
 
     async def _parse_messages(self, url: str) -> list[dict[str, Any]]:
-        """Parses message rows for ImmortalSeed structure."""
+        """Parses message rows for ImmortalSeed structure.
+
+        Args:
+            url (str): The URL to parse.
+
+        Returns:
+            list[dict[str, Any]]: List of messages.
+        """
         new_items: list[dict[str, Any]] = []
         response = await self._fetch_page(url, "messages", success_text="browse.php")
         soup = BeautifulSoup(response, "html.parser")
@@ -92,7 +103,14 @@ class ImmortalSeed(BaseTracker):
         return new_items
 
     async def _fetch_body(self, url: str) -> str:
-        """Navigates to the message URL and extracts the content body."""
+        """Navigates to the message URL and extracts the content body.
+
+        Args:
+            url (str): The URL to parse.
+
+        Returns:
+            str: The body of the message.
+        """
         try:
             response = await self._fetch_page(url, "message body")
             soup = BeautifulSoup(response, "html.parser")

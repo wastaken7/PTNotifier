@@ -13,8 +13,16 @@ async def send_ntfy(
     _base_url: str,
     notifications_url: str,
 ) -> None:
-    """
-    Sends a formatted notification to ntfy.
+    """Sends a formatted notification to ntfy.
+
+    Args:
+        item (dict[str, Any]): The item to send.
+        tracker_name (str): The name of the tracker.
+        _base_url (str): The base URL of the tracker.
+        notifications_url (str): The URL to the notifications page.
+
+    Returns:
+        None
     """
     ntfy_url: str = config.SETTINGS.get("NTFY_URL", "").rstrip("/")
     ntfy_topic: str = config.SETTINGS.get("NTFY_TOPIC", "")
@@ -58,7 +66,7 @@ async def send_ntfy(
 
     url = f"{ntfy_url}"
 
-    headers = {}
+    headers: dict[str, str] = {}
     if ntfy_token:
         headers["Authorization"] = f"Bearer {ntfy_token}"
 
@@ -74,8 +82,13 @@ async def send_ntfy(
 
 
 def format_for_ntfy(raw_description: str) -> str:
-    """
-    Converts BBCode and HTML to Markdown suitable for ntfy.
+    """Converts BBCode and HTML to Markdown suitable for ntfy.
+
+    Args:
+        raw_description (str): The raw description to convert.
+
+    Returns:
+        str: The converted description.
     """
     # Bold
     raw_description = re.sub(r"\[b\](.*?)\[/b\]|<b>(.*?)</b>|<strong>(.*?)</strong>", r"**\1\2\3**", raw_description, flags=re.IGNORECASE)

@@ -27,11 +27,20 @@ class SceneTime(BaseTracker):
         self.inbox_url = urljoin(self.base_url, "inbox.php")
 
     async def _fetch_items(self) -> list[dict[str, Any]]:
-        """Fetch messages from SceneTime inbox."""
+        """Fetch messages from SceneTime inbox.
+
+        Returns:
+            list[dict[str, Any]]: List of messages.
+        """
         inbox_items = await self._parse_messages(self.inbox_url)
         return inbox_items
 
     async def _fetch_test_item(self) -> dict[str, Any] | None:
+        """Fetch a test item from the tracker.
+
+        Returns:
+            dict[str, Any] | None: Test item or None if not found.
+        """
         unread_items = await self._fetch_items()
         if unread_items:
             return unread_items[0]
@@ -43,7 +52,16 @@ class SceneTime(BaseTracker):
         return None
 
     async def _parse_messages(self, url: str, include_read: bool = False, ignore_processed: bool = False) -> list[dict[str, Any]]:
-        """Parses the inbox for SceneTime messages and extracts bodies from hidden divs."""
+        """Parses the inbox for SceneTime messages and extracts bodies from hidden divs.
+
+        Args:
+            url (str): The URL to parse.
+            include_read (bool): Whether to include read messages.
+            ignore_processed (bool): Whether to ignore processed messages.
+
+        Returns:
+            list[dict[str, Any]]: List of messages.
+        """
         new_items: list[dict[str, Any]] = []
         response = await self._fetch_page(url, "messages", success_text="request.php")
         soup = BeautifulSoup(response, "html.parser")

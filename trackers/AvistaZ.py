@@ -27,6 +27,12 @@ class AvistaZ(BaseTracker):
         self.messages_url = self.base_url + "messenger"
 
     def get_favicon(self) -> str:
+        """
+        Get the favicon for the current tracker domain.
+
+        Returns:
+            str: The URL of the favicon.
+        """
         if "privatehd" in self.domain:
             return "https://privatehd.to/images/privatehd-favicon.png"
         elif "cinemaz" in self.domain:
@@ -39,12 +45,23 @@ class AvistaZ(BaseTracker):
             return "https://avistaz.to/images/avistaz-favicon.png"
 
     async def _fetch_items(self) -> list[dict[str, Any]]:
-        """Fetch all new items from the tracker."""
+        """
+        Fetch all new items from the tracker.
+
+        Returns:
+            list[dict[str, Any]]: List of new items found on the tracker.
+        """
         notifications = await self._fetch_and_parse_notifications()
         messages = await self._fetch_and_parse_messages()
         return notifications + messages
 
     async def _fetch_test_item(self) -> dict[str, Any] | None:
+        """
+        Fetch a single test item (the first unread message or first read message if no unread).
+
+        Returns:
+            dict[str, Any] | None: The test item with its body, or None if no items are found.
+        """
         unread_items = await self._fetch_items()
         if unread_items:
             return unread_items[0]
@@ -56,6 +73,12 @@ class AvistaZ(BaseTracker):
         return None
 
     async def _fetch_and_parse_notifications(self) -> list[dict[str, Any]]:
+        """
+        Fetch and parse notifications from the tracker.
+
+        Returns:
+            list[dict[str, Any]]: List of notifications found.
+        """
         new_items: list[dict[str, Any]] = []
         response = await self._fetch_page(self.notifications_url, "notifications")
         soup = BeautifulSoup(response, "html.parser")
@@ -99,6 +122,16 @@ class AvistaZ(BaseTracker):
         return new_items
 
     async def _fetch_and_parse_messages(self, include_read: bool = False, ignore_processed: bool = False) -> list[dict[str, Any]]:
+        """
+        Fetch and parse messages from the tracker.
+
+        Args:
+            include_read (bool): Whether to include read messages.
+            ignore_processed (bool): Whether to ignore processed messages.
+
+        Returns:
+            list[dict[str, Any]]: List of messages found.
+        """
         new_items: list[dict[str, Any]] = []
         response = await self._fetch_page(self.messages_url, "messages", success_text="messenger/new")
         soup = BeautifulSoup(response, "html.parser")
@@ -150,6 +183,12 @@ class AvistaZ(BaseTracker):
     async def _fetch_body(self, url: str) -> str:
         """
         Fetches and parses the content of a specific message.
+
+        Args:
+            url (str): The URL of the message body to fetch.
+
+        Returns:
+            str: The body of the message, or an error message if something goes wrong.
         """
         try:
             response = await self._fetch_page(url, "message body")

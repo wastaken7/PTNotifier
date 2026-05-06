@@ -10,15 +10,20 @@ from PIL import Image
 import config
 from utils.console import log
 
-
 DEFAULT_DISCORD_EMBED_DESCRIPTION_LIMIT = 4096
 DISCORD_TRUNCATION_NOTICE = "\n\n...[truncated]"
 
 
 async def get_local_favicon(client: httpx.AsyncClient, icon_url: str, tracker_name: str) -> tuple[Optional[Path], str]:
-    """
-    Downloads the favicon from a URL, converts it to PNG, and saves it.
-    Returns a tuple containing the local Path (if successful) and the filename.
+    """Downloads the favicon from a URL, converts it to PNG, and saves it.
+
+    Args:
+        client (httpx.AsyncClient): The HTTP client.
+        icon_url (str): The URL of the favicon.
+        tracker_name (str): The name of the tracker.
+
+    Returns:
+        tuple[Optional[Path], str]: A tuple containing the local Path (if successful) and the filename.
     """
     icons_dir = Path("state") / "favicon"
     await icons_dir.mkdir(parents=True, exist_ok=True)
@@ -58,8 +63,16 @@ async def send_discord(
     base_url: str,
     notifications_url: str,
 ) -> None:
-    """
-    Main function to send a formatted notification to Discord via Webhook.
+    """Sends a formatted notification to Discord via Webhook.
+
+    Args:
+        item (dict[str, str]): The item to send.
+        tracker_name (str): The name of the tracker.
+        base_url (str): The base URL of the tracker.
+        notifications_url (str): The URL to the notifications page.
+
+    Returns:
+        None
     """
     webhook_url: str = config.SETTINGS.get("DISCORD_WEBHOOK_URL", "")
     if not webhook_url:
@@ -127,8 +140,14 @@ async def send_discord(
 
 
 def trim_discord_description(description: str, notifications_url: str) -> str:
-    """
-    Trims embed descriptions to Discord's description limit while keeping the action link.
+    """Trims embed descriptions to Discord's description limit while keeping the action link.
+
+    Args:
+        description (str): The description to trim.
+        notifications_url (str): The URL to the notifications page.
+
+    Returns:
+        str: The trimmed description.
     """
     description_limit = config.SETTINGS.get("DISCORD_EMBED_DESCRIPTION_LIMIT", DEFAULT_DISCORD_EMBED_DESCRIPTION_LIMIT)
     action_link = f"[Open Notification]({notifications_url})"
@@ -145,8 +164,13 @@ def trim_discord_description(description: str, notifications_url: str) -> str:
 
 
 def format_for_discord(raw_description: str):
-    """
-    Converts BBCode and HTML to Discord Markdown.
+    """Converts BBCode and HTML to Discord Markdown.
+
+    Args:
+        raw_description (str): The raw description to convert.
+
+    Returns:
+        str: The converted description.
     """
     # Bold
     raw_description = re.sub(r"\[b\](.*?)\[/b\]|<b>(.*?)</b>|<strong>(.*?)</strong>", r"**\1\2\3**", raw_description, flags=re.IGNORECASE)

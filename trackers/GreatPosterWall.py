@@ -27,12 +27,23 @@ class GreatPosterWall(BaseTracker):
         self.staff_url = urljoin(self.base_url, "staffpm.php")
 
     async def _fetch_items(self) -> list[dict[str, Any]]:
-        """Fetch standard and staff messages."""
+        """
+        Fetch standard and staff messages.
+
+        Returns:
+            list[dict[str, Any]]: List of items.
+        """
         inbox_items = await self._parse_messages(self.inbox_url, is_staff=False)
         staff_items = await self._parse_messages(self.staff_url, is_staff=True)
         return inbox_items + staff_items
 
     async def _fetch_test_item(self) -> dict[str, Any] | None:
+        """
+        Fetch one test item from the tracker.
+
+        Returns:
+            dict[str, Any] | None: Test item, or None if not found.
+        """
         unread_items = await self._fetch_items()
         if unread_items:
             return unread_items[0]
@@ -48,7 +59,18 @@ class GreatPosterWall(BaseTracker):
         return None
 
     async def _parse_messages(self, url: str, is_staff: bool, include_read: bool = False, ignore_processed: bool = False) -> list[dict[str, Any]]:
-        """Parses the message table and fetches bodies for unread conversations."""
+        """
+        Parses the message table and fetches bodies for unread conversations.
+
+        Args:
+            url (str): The URL to parse.
+            is_staff (bool): Whether the messages are from staff.
+            include_read (bool, optional): Whether to include read messages. Defaults to False.
+            ignore_processed (bool, optional): Whether to ignore processed messages. Defaults to False.
+
+        Returns:
+            list[dict[str, Any]]: List of messages.
+        """
         new_items: list[dict[str, Any]] = []
         message_type = "messages" if not is_staff else "staff messages"
         response = await self._fetch_page(url, message_type, success_text="forums.php")
@@ -87,6 +109,15 @@ class GreatPosterWall(BaseTracker):
     async def _fetch_body(self, url: str, subject: str, is_staff: bool, ignore_processed: bool = False) -> list[dict[str, Any]]:
         """
         Fetches the conversation page and extracts individual messages.
+
+        Args:
+            url (str): The URL to fetch.
+            subject (str): The subject of the conversation.
+            is_staff (bool): Whether the messages are from staff.
+            ignore_processed (bool, optional): Whether to ignore processed messages. Defaults to False.
+
+        Returns:
+            list[dict[str, Any]]: List of messages.
         """
         messages_found: list[dict[str, Any]] = []
         response = await self._fetch_page(url, "message body")

@@ -18,6 +18,9 @@ user_config, api_tokens, discord_webhook_url, telegram_bot_token, telegram_chat_
 
 
 def parse_args() -> argparse.Namespace:
+    """
+    Parse command line arguments.
+    """
     parser = argparse.ArgumentParser(description="PTNotifier")
     parser.add_argument(
         "--test-notification",
@@ -30,6 +33,15 @@ def parse_args() -> argparse.Namespace:
 
 
 def parse_test_notification_targets(raw_target: str | None) -> list[str] | None:
+    """
+    Parse the target trackers for test notifications.
+
+    Args:
+        raw_target: Raw target string from command line arguments.
+
+    Returns:
+        List of target trackers or None if no target is specified.
+    """
     if raw_target is None:
         return None
 
@@ -38,6 +50,15 @@ def parse_test_notification_targets(raw_target: str | None) -> list[str] | None:
 
 
 def iter_tracker_instances(tracker_classes: dict[str, Any]) -> list[tuple[str, Any]]:
+    """
+    Iterate through tracker instances based on cookie files.
+
+    Args:
+        tracker_classes: Dictionary of tracker classes.
+
+    Returns:
+        List of tracker instances.
+    """
     cookies_dir = Path("./cookies")
     instances: list[tuple[str, Any]] = []
 
@@ -71,6 +92,16 @@ def iter_tracker_instances(tracker_classes: dict[str, Any]) -> list[tuple[str, A
 
 
 async def run_test_notification(tracker_classes: dict[str, Any], target_trackers: list[str] | None) -> int:
+    """
+    Run test notifications for the specified trackers.
+
+    Args:
+        tracker_classes: Dictionary of tracker classes.
+        target_trackers: List of target trackers.
+
+    Returns:
+        0 if successful, 1 otherwise.
+    """
     candidates = iter_tracker_instances(tracker_classes)
     if target_trackers:
         normalized_targets = {target.lower() for target in target_trackers}

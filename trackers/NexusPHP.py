@@ -25,10 +25,20 @@ class NexusPHP(BaseTracker):
         self.inbox_url = urljoin(self.base_url, "messages.php?action=viewmailbox&box=1&unread=yes")
 
     async def _fetch_items(self) -> list[dict[str, Any]]:
+        """Fetch messages from NexusPHP inbox.
+
+        Returns:
+            list[dict[str, Any]]: List of messages.
+        """
         inbox_items = await self._parse_messages(self.inbox_url)
         return inbox_items
 
     async def _fetch_test_item(self) -> dict[str, Any] | None:
+        """Fetch a test item from the tracker.
+
+        Returns:
+            dict[str, Any] | None: Test item or None if not found.
+        """
         unread_items = await self._fetch_items()
         if unread_items:
             return unread_items[0]
@@ -40,6 +50,16 @@ class NexusPHP(BaseTracker):
         return None
 
     async def _parse_messages(self, url: str, include_read: bool = False, ignore_processed: bool = False) -> list[dict[str, Any]]:
+        """Parses message rows for NexusPHP structure.
+
+        Args:
+            url (str): The URL to parse.
+            include_read (bool): Whether to include read messages.
+            ignore_processed (bool): Whether to ignore processed messages.
+
+        Returns:
+            list[dict[str, Any]]: List of messages.
+        """
         new_items: list[dict[str, Any]] = []
         response = await self._fetch_page(url, "messages", success_text="torrents.php")
         soup = BeautifulSoup(response, "html.parser")
@@ -102,7 +122,14 @@ class NexusPHP(BaseTracker):
         return new_items
 
     async def _fetch_body(self, url: str) -> str:
-        """Navigates to the message URL and extracts the content body."""
+        """Navigates to the message URL and extracts the content body.
+
+        Args:
+            url (str): The URL to parse.
+
+        Returns:
+            str: The body of the message.
+        """
         try:
             response = await self._fetch_page(url, "message body")
             soup = BeautifulSoup(response, "html.parser")

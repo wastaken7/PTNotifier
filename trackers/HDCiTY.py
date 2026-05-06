@@ -26,12 +26,23 @@ class HDCiTY(BaseTracker):
         self.inbox_url = urljoin(self.base_url, "messages")
 
     async def _fetch_items(self) -> list[dict[str, Any]]:
-        """Fetch messages from HDCiTY inbox."""
+        """Fetch messages from HDCiTY inbox.
+
+        Returns:
+            list[dict[str, Any]]: List of messages.
+        """
         inbox_items = await self._parse_messages(self.inbox_url)
         return inbox_items
 
     async def _parse_messages(self, url: str) -> list[dict[str, Any]]:
-        """Parses the inbox for HDCiTY messages."""
+        """Parses the inbox for HDCiTY messages.
+
+        Args:
+            url (str): The URL to parse.
+
+        Returns:
+            list[dict[str, Any]]: List of messages.
+        """
         new_items: list[dict[str, Any]] = []
         response = await self._fetch_page(url, "messages", success_text="messages?action=editmailboxes")
         soup = BeautifulSoup(response, "html.parser")

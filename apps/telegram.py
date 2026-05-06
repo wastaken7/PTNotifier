@@ -13,8 +13,16 @@ async def send_telegram(
     _base_url: str,
     notifications_url: str,
 ) -> None:
-    """
-    Sends a formatted notification to Telegram.
+    """Sends a formatted notification to Telegram.
+
+    Args:
+        item (dict[str, str]): The item to send.
+        tracker_name (str): The name of the tracker.
+        _base_url (str): The base URL of the tracker.
+        notifications_url (str): The URL to the notifications page.
+
+    Returns:
+        None
     """
     telegram_bot_token: str = config.SETTINGS.get("TELEGRAM_BOT_TOKEN", "")
     telegram_chat_id: str = config.SETTINGS.get("TELEGRAM_CHAT_ID", "")
@@ -74,8 +82,13 @@ async def send_telegram(
             log.debug("Telegram error details", exc_info=True)
 
 def format_for_telegram(text: str) -> str:
-    """
-    Converts BBCode and generic HTML to Telegram-compatible HTML.
+    """Converts BBCode and generic HTML to Telegram-compatible HTML.
+
+    Args:
+        text (str): The text to convert.
+
+    Returns:
+        str: The converted text.
     """
     # 1. Normalize BBCode to HTML
     text = re.sub(r"\[b\](.*?)\[/b\]", r"<b>\1</b>", text, flags=re.IGNORECASE)

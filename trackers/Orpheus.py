@@ -33,7 +33,11 @@ class Orpheus(BaseTracker):
         self.conv_api = urljoin(self.base_url, "ajax.php?action=inbox&type=viewconv&id=")
 
     async def _fetch_items(self) -> list[dict[str, Any]]:
-        """Fetch messages from Orpheus API."""
+        """Fetch messages from Orpheus API.
+
+        Returns:
+            list[dict[str, Any]]: List of messages.
+        """
         if not self.api_token:
             log.warning(f"{self.tracker}: API Token not found in config. Skipping...")
             return []
@@ -41,7 +45,11 @@ class Orpheus(BaseTracker):
         return await self._fetch_mailbox()
 
     async def _fetch_mailbox(self) -> list[dict[str, Any]]:
-        """Parses the inbox AJAX response."""
+        """Parses the inbox AJAX response.
+
+        Returns:
+            list[dict[str, Any]]: List of messages.
+        """
         new_items: list[dict[str, Any]] = []
         raw_data = await self._fetch_page(self.inbox_api, "messages", success_text='"status":"success"')
         if not raw_data:
@@ -91,7 +99,14 @@ class Orpheus(BaseTracker):
         return new_items
 
     async def _fetch_conversation_body(self, conv_id: str) -> str:
-        """Fetches the actual text content of a specific conversation."""
+        """Fetches the actual text content of a specific conversation.
+
+        Args:
+            conv_id (str): The ID of the conversation.
+
+        Returns:
+            str: The body of the message.
+        """
         url = f"{self.conv_api}{conv_id}"
         raw_data = await self._fetch_page(url, f"conversation {conv_id}")
 

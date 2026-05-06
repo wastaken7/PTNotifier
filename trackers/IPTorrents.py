@@ -25,11 +25,22 @@ class IPTorrents(BaseTracker):
         self.inbox_url = urljoin(self.base_url, "inbox")
 
     async def _fetch_items(self) -> list[dict[str, Any]]:
-        """Fetch messages from IPTorrents inbox."""
+        """Fetch messages from IPTorrents inbox.
+
+        Returns:
+            list[dict[str, Any]]: List of messages.
+        """
         return await self._parse_messages(self.inbox_url)
 
     async def _parse_messages(self, url: str) -> list[dict[str, Any]]:
-        """Parses the message list structure from IPTorrents HTML."""
+        """Parses the message list structure from IPTorrents HTML.
+
+        Args:
+            url (str): The URL to parse.
+
+        Returns:
+            list[dict[str, Any]]: List of messages.
+        """
         new_items: list[dict[str, Any]] = []
         response = await self._fetch_page(url, "messages", success_text="settings.php")
         soup = BeautifulSoup(response, "html.parser")
@@ -82,6 +93,12 @@ class IPTorrents(BaseTracker):
         """
         Fetches the message body using the IPTorrents XHR API.
         The API returns a JSON containing HTML instructions.
+
+        Args:
+            item_id (str): The ID of the message.
+
+        Returns:
+            str: The body of the message.
         """
         api_url = urljoin(self.base_url, "API.php")
 

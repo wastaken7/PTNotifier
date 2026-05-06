@@ -24,7 +24,11 @@ class SportsCult(BaseTracker):
         )
 
     async def _fetch_items(self) -> list[dict[str, Any]]:
-        """Fetch messages from SportsCult mailbox."""
+        """Fetch messages from SportsCult mailbox.
+
+        Returns:
+            list[dict[str, Any]]: List of messages.
+        """
         if not self.state.get("notifications_url"):
             response = await self._fetch_page(self.base_url, "user ID")
             soup = BeautifulSoup(response, "html.parser")
@@ -46,7 +50,14 @@ class SportsCult(BaseTracker):
         return await self._parse_messages(target_url)
 
     async def _parse_messages(self, url: str) -> list[dict[str, Any]]:
-        """Parses the XBTIT message table for SportsCult and fetches bodies."""
+        """Parses the XBTIT message table for SportsCult and fetches bodies.
+
+        Args:
+            url (str): The URL to parse.
+
+        Returns:
+            list[dict[str, Any]]: List of messages.
+        """
         new_items: list[dict[str, Any]] = []
         response = await self._fetch_page(url, "messages", success_text="Mailbox")
         soup = BeautifulSoup(response, "html.parser")
@@ -100,7 +111,14 @@ class SportsCult(BaseTracker):
         return new_items
 
     async def _fetch_body(self, url: str) -> str:
-        """Navigates to the message URL and extracts the PM content."""
+        """Navigates to the message URL and extracts the PM content.
+
+        Args:
+            url (str): The URL to parse.
+
+        Returns:
+            str: The body of the message.
+        """
         try:
             response = await self._fetch_page(url, "message body")
             soup = BeautifulSoup(response, "html.parser")
