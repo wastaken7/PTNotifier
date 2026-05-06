@@ -43,6 +43,7 @@ These are specific trackers that have their own dedicated module. The cookie fil
 | `BTArg.py` | `www.btarg.com.ar` | `BTArg.txt` | - |
 | `BTSCHOOL.py` | `pt.btschool.club`| `BTSCHOOL.txt` | - |
 | `DigitalCore.py` | `digitalcore.club`| `DigitalCore.txt` | - |
+| `Fappaizuri.py` | `fappaizuri.me` | `Fappaizuri.txt` | - |
 | `GreatPosterWall.py` | `greatposterwall.com`| `GreatPosterWall.txt` | - |
 | `HawkeUno.py` | `hawke.uno`| `HawkeUno.txt` | - |
 | `HDCiTY.py` | `hdcity.city`| `HDCiTY.txt` | - |
