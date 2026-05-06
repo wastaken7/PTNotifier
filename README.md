@@ -40,6 +40,7 @@ These are specific trackers that have their own dedicated module. The cookie fil
 | `Baozi.py` | `p.t-baozi.cc` | `Baozi.txt` | - |
 | `BJShare.py` | `bj-share.info`| `BJShare.txt` | - |
 | `BrasilTracker.py` | `brasiltracker.org` | `BrasilTracker.txt` | - |
+| `BTArg.py` | `www.btarg.com.ar` | `BTArg.txt` | - |
 | `BTSCHOOL.py` | `pt.btschool.club`| `BTSCHOOL.txt` | - |
 | `DigitalCore.py` | `digitalcore.club`| `DigitalCore.txt` | - |
 | `GreatPosterWall.py` | `greatposterwall.com`| `GreatPosterWall.txt` | - |
