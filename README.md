@@ -64,6 +64,7 @@ These are specific trackers that have their own dedicated module. The cookie fil
 | `SportsCult.py` | `sportscult.org`| `SportsCult.txt` | inbox | - |
 | `TorrentDay.py` | `torrentday.com`| `TorrentDay.txt` | inbox | - |
 | `TorrentLeech.py` | `torrentleech.org`| `TorrentLeech.txt` | notifications | - |
+| `YGGReborn.py` | `www.yggreborn.org`| `YGGReborn.txt` | inbox | - |
 
 ## Setup
 
