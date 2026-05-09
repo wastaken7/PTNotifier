@@ -31,36 +31,36 @@ For these types, the name of the cookie file does not matter, as long as it is a
 These are specific trackers that have their own dedicated module. The cookie file **must be placed in the `cookies/Other/` directory** and **must have a specific name** that matches the tracker's module.
 
 ### Supported Trackers List
-| Module | Website URL | Required Cookie Filename | Observation |
-| :--- | :--- | :--- | :--- |
-| `UNIT3D.py` | - | - | All UNIT3D trackers (in theory), if the tracker is highly customized, it is likely that it will not work. If you do not know whether a tracker is UNIT3D, check it's code base [here](https://hdvinnie.github.io/Private-Trackers-Spreadsheet/). |
-| `AvistaZ.py` | - | - | This includes AvistaZ, CinemaZ, PrivateHD, ExoticaZ.|
-| `AmigosShareClub.py` | `cliente.amigos-share.club`| `AmigosShareClub.txt` | - |
-| `Anthelion.py` | `anthelion.me` | - | API Key required in config.py |
-| `Baozi.py` | `p.t-baozi.cc` | `Baozi.txt` | - |
-| `BJShare.py` | `bj-share.info`| `BJShare.txt` | - |
-| `BrasilTracker.py` | `brasiltracker.org` | `BrasilTracker.txt` | - |
-| `BTArg.py` | `www.btarg.com.ar` | `BTArg.txt` | - |
-| `BTSCHOOL.py` | `pt.btschool.club`| `BTSCHOOL.txt` | - |
-| `DigitalCore.py` | `digitalcore.club`| `DigitalCore.txt` | - |
-| `Fappaizuri.py` | `fappaizuri.me` | `Fappaizuri.txt` | - |
-| `GreatPosterWall.py` | `greatposterwall.com`| `GreatPosterWall.txt` | - |
-| `HawkeUno.py` | `hawke.uno`| `HawkeUno.txt` | - |
-| `HDCiTY.py` | `hdcity.city`| `HDCiTY.txt` | - |
-| `HDSpace.py` | `hd-space.org`| `HDSpace.txt` | - |
-| `HDTorrents.py` | `hd-torrents.org`| `HDTorrents.txt` | ⚠️ PTN spoofs the User-Agent for it to work. |
-| `ImmortalSeed.py` | `immortalseed.me`| `ImmortalSeed.txt` | - |
-| `IPTorrents.py` | `iptorrents.com`| `IPTorrents.txt` | - |
-| `Lajidui.py` | `pt.lajidui.top`| `Lajidui.txt` | - |
-| `LongPT.py` | `longpt.org`| `LongPT.txt` | - |
-| `March.py` | `duckboobee.org`| `March.txt` | - |
-| `Orpheus.py` | `orpheus.network`| `Orpheus.txt` | It is necessary to add an API key in config.py |
-| `PTFans.py` | `ptfans.cc`| `PTFans.txt` | No longer maintained, support is provided as-is. |
-| `PTSKit.py` | `ptskit.org`| `PTSKit.txt` | - |
-| `SceneTime.py` | `scenetime.com`| `SceneTime.txt` | - |
-| `SportsCult.py` | `sportscult.org`| `SportsCult.txt` | - |
-| `TorrentDay.py` | `torrentday.com`| `TorrentDay.txt` | - |
-| `TorrentLeech.py` | `torrentleech.org`| `TorrentLeech.txt` | Currently only supports site notifications, not private messages. |
+| Module | Website URL | Required Cookie Filename | Capabilities | Observation |
+| :--- | :--- | :--- | :--- | :--- |
+| `UNIT3D.py` | - | - |  inbox, notifications | All UNIT3D trackers (in theory), if the tracker is highly customized, it is likely that it will not work. If you do not know whether a tracker is UNIT3D, check it's code base [here](https://hdvinnie.github.io/Private-Trackers-Spreadsheet/). |
+| `AvistaZ.py` | - | - |  inbox, notifications | This includes AvistaZ, CinemaZ, PrivateHD, ExoticaZ.|
+| `AmigosShareClub.py` | `cliente.amigos-share.club`| `AmigosShareClub.txt` | inbox | - |
+| `Anthelion.py` | `anthelion.me` | - | inbox | API Key required in config.py |
+| `Baozi.py` | `p.t-baozi.cc` | `Baozi.txt` | inbox | - |
+| `BJShare.py` | `bj-share.info`| `BJShare.txt` | inbox, staffpm | - |
+| `BrasilTracker.py` | `brasiltracker.org` | `BrasilTracker.txt` | inbox, staffpm | - |
+| `BTArg.py` | `www.btarg.com.ar` | `BTArg.txt` | inbox | - |
+| `BTSCHOOL.py` | `pt.btschool.club`| `BTSCHOOL.txt` | inbox | - |
+| `DigitalCore.py` | `digitalcore.club`| `DigitalCore.txt` | inbox, notifications | - |
+| `Fappaizuri.py` | `fappaizuri.me` | `Fappaizuri.txt` | inbox | - |
+| `GreatPosterWall.py` | `greatposterwall.com`| `GreatPosterWall.txt` | inbox, staffpm | - |
+| `HawkeUno.py` | `hawke.uno`| `HawkeUno.txt` | inbox, notifications | - |
+| `HDCiTY.py` | `hdcity.city`| `HDCiTY.txt` | inbox | - |
+| `HDSpace.py` | `hd-space.org`| `HDSpace.txt` | inbox | - |
+| `HDTorrents.py` | `hd-torrents.org`| `HDTorrents.txt` | inbox | ⚠️ PTN spoofs the User-Agent for it to work. |
+| `ImmortalSeed.py` | `immortalseed.me`| `ImmortalSeed.txt` | inbox | - |
+| `IPTorrents.py` | `iptorrents.com`| `IPTorrents.txt` | inbox | - |
+| `Lajidui.py` | `pt.lajidui.top`| `Lajidui.txt` | inbox | - |
+| `LongPT.py` | `longpt.org`| `LongPT.txt` | inbox | - |
+| `March.py` | `duckboobee.org`| `March.txt` | inbox | - |
+| `Orpheus.py` | `orpheus.network`| `Orpheus.txt` | inbox | It is necessary to add an API key in config.py |
+| `PTFans.py` | `ptfans.cc`| `PTFans.txt` | inbox | - |
+| `PTSKit.py` | `ptskit.org`| `PTSKit.txt` | inbox | - |
+| `SceneTime.py` | `scenetime.com`| `SceneTime.txt` | inbox | - |
+| `SportsCult.py` | `sportscult.org`| `SportsCult.txt` | inbox | - |
+| `TorrentDay.py` | `torrentday.com`| `TorrentDay.txt` | inbox | - |
+| `TorrentLeech.py` | `torrentleech.org`| `TorrentLeech.txt` | notifications | - |
 
 ## Setup
 
