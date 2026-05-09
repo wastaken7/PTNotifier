@@ -55,8 +55,11 @@ These are specific trackers that have their own dedicated module. The cookie fil
 | `LongPT.py` | `longpt.org`| `LongPT.txt` | inbox | - |
 | `March.py` | `duckboobee.org`| `March.txt` | inbox | - |
 | `Orpheus.py` | `orpheus.network`| `Orpheus.txt` | inbox | It is necessary to add an API key in config.py |
+| `PTCafe.py` | `ptcafe.club`| `PTCafe.txt` | inbox | - |
 | `PTFans.py` | `ptfans.cc`| `PTFans.txt` | inbox | - |
+| `PTGTK.py` | `pt.gtkpw.xyz`| `PTGTK.txt` | inbox | - |
 | `PTSKit.py` | `ptskit.org`| `PTSKit.txt` | inbox | - |
+| `RailgunPT.py` | `bilibili.download`| `RailgunPT.txt` | inbox | - |
 | `SceneTime.py` | `scenetime.com`| `SceneTime.txt` | inbox | - |
 | `SportsCult.py` | `sportscult.org`| `SportsCult.txt` | inbox | - |
 | `TorrentDay.py` | `torrentday.com`| `TorrentDay.txt` | inbox | - |
