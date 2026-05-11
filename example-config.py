@@ -15,10 +15,10 @@ SETTINGS: dict[str, Any] = {
     # Seconds between checks
     # Make sure not to overload trackers
     # It might get you banned!
-    # Minimum is 900 (15 minutes)
+    # Minimum is 1800 (30 minutes)
     "CHECK_INTERVAL": 1800,
     # Only available for some trackers
-    "MARK_AS_READ": True,
+    "MARK_AS_READ": False,
     # HTTP request timeout in seconds
     # Default is 30 seconds
     # Increase if you have a slow connection or the tracker is slow

@@ -179,7 +179,7 @@ The first time you run the script, it will create a `config.py` file from `examp
 -   **`NTFY_TOPIC`**: The name of the ntfy topic.
 -   **`NTFY_TOKEN`**: (Optional) Bearer token for protected ntfy topics.
 -   **`NTFY_PRIORITY`**: Priority level for ntfy notifications (default: 3).
--   **`CHECK_INTERVAL`**: The time in seconds between checks. The minimum is 900 seconds (15 minutes) to avoid spamming trackers. Please note that some trackers have specific rules regarding the frequency of automated requests, and PTN will automatically adjust the interval if it is set too low for that specific tracker.
+-   **`CHECK_INTERVAL`**: The time in seconds between checks. The minimum is 1800 seconds (30 minutes) to avoid spamming trackers. Please note that some trackers have specific rules regarding the frequency of automated requests, and PTN will automatically adjust the interval if it is set too low for that specific tracker.
 -   **`MARK_AS_READ`**: (Optional) For some trackers, the script can attempt to mark notifications as read. Set to `True` or `False`.
 -   **`TIMEOUT`**: The timeout in seconds for network requests.
 -   **`REQUEST_DELAY`**: Delay in seconds between requests to avoid being rate-limited.
