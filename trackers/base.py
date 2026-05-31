@@ -20,6 +20,15 @@ from utils.console import log
 from utils.cookies import valid_response
 
 
+class TrackerRequestError(Exception):
+    """
+    Raised when a request to a tracker fails due to connection issues,
+    timeout, HTTP error status, or failed validation/expired cookies.
+    """
+
+    pass
+
+
 class BaseTracker(ABC):
     """
     Base class for tracker sessions.
@@ -199,6 +208,58 @@ class BaseTracker(ABC):
             )
             await asyncio.sleep(3)
 
+    async def send_error_notification(self, error_message: str) -> None:
+        """
+        Sends an error notification to all configured notifiers.
+        Respects the 24-hour rate limit (one per site per 24 hours).
+        """
+        now = time.time()
+        last_error_time = self.state.get("last_error_notification_time", 0.0)
+
+        # 24 hours in seconds = 86400
+        if now - last_error_time < 86400:
+            log.info(f"{self.tracker}: Error notification suppressed (sent in the last 24h).")
+            return
+
+        notifiers = self._collect_notifiers()
+        if not notifiers:
+            log.warning(f"{self.tracker}: No notification backends configured, skipping error notification.")
+            return
+
+        body = (
+            f"An error occurred while fetching notifications from {self.tracker} ({self.base_url}).\n\n"
+            f"**Error:** {error_message}\n\n"
+            "Error messages are sent only once every 24 hours per tracker."
+        )
+
+        item = {
+            "type": "error",
+            "title": "Request Failure / Expired Cookies",
+            "subject": f"Error communicating with {self.tracker}",
+            "body": body,
+            "date": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(now)),
+            "url": self.base_url,
+        }
+
+        log.info(f"{self.tracker}: Sending error notification to active notifiers...")
+
+        # Send the notification to all active notifiers
+        for notifier in notifiers:
+            try:
+                await notifier(
+                    item,
+                    self.tracker,
+                    self.base_url,
+                    item["url"],
+                )
+                await asyncio.sleep(3)
+            except Exception as notifier_err:
+                log.error(f"{self.tracker}: Failed to send error notification via notifier: {notifier_err}")
+
+        # Update and save the state with the timestamp
+        self.state["last_error_notification_time"] = now
+        self._save_state()
+
     async def fetch_notifications(self) -> float:
         """
         Fetch notifications from the tracker, respecting the scrape interval.
@@ -270,6 +331,7 @@ class BaseTracker(ABC):
         except Exception as e:
             log.error(f"{self.tracker}: Error processing {self.base_url}: {e}")
             log.debug("Processing error details", exc_info=True)
+            await self.send_error_notification(str(e))
         finally:
             await self.client.aclose()
 
@@ -481,7 +543,11 @@ class BaseTracker(ABC):
             response.raise_for_status()
 
             if success_text:
-                valid_response(self.tracker, response.text, success_text)
+                if not valid_response(self.tracker, response.text, success_text):
+                    raise TrackerRequestError(
+                        f"Validation failed: keyword '{success_text}' not found in the HTML response. "
+                        "Possible reasons: Expired cookies, IP ban, site maintenance, HTML change."
+                    )
 
             async with BaseTracker._request_lock:
                 BaseTracker._last_request_time = time.monotonic()
@@ -492,18 +558,23 @@ class BaseTracker(ABC):
         except httpx.HTTPStatusError as e:
             error_msg = f"{self.tracker}: HTTP {e.response.status_code} error for {request_type}"
             log.error(error_msg)
+            raise TrackerRequestError(error_msg) from e
 
-        except httpx.TimeoutException:
+        except httpx.TimeoutException as e:
             error_msg = f"{self.tracker}: Timeout fetching {request_type}"
             log.error(error_msg)
+            raise TrackerRequestError(error_msg) from e
 
         except httpx.RequestError as e:
             error_msg = f"{self.tracker}: Network error fetching {request_type}: {e}"
             log.error(error_msg)
+            raise TrackerRequestError(error_msg) from e
 
-        except Exception:
+        except TrackerRequestError:
+            raise
+
+        except Exception as e:
             error_msg = f"{self.tracker}: Unexpected error fetching {request_type}"
             log.error(error_msg)
             log.debug("Error details", exc_info=True)
-
-        return ""
+            raise TrackerRequestError(f"{error_msg}: {e}") from e
