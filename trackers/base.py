@@ -328,6 +328,7 @@ class BaseTracker(ABC):
                 await self._ack_item(item)
             self.state["last_run"] = time.time()
             self._save_state()
+            self.save_cookies()
         except Exception as e:
             log.error(f"{self.tracker}: Error processing {self.base_url}: {e}")
             log.debug("Processing error details", exc_info=True)
@@ -471,6 +472,16 @@ class BaseTracker(ABC):
 
         return None
 
+    def save_cookies(self) -> None:
+        """
+        Saves updated cookies to the cookie file.
+        """
+        if not getattr(self, "api_only", False):
+            try:
+                self.cookie_jar.save(ignore_discard=True, ignore_expires=True)
+            except Exception as e:
+                log.error(f"{self.tracker}: Failed to save updated cookies to {self.filename}: {e}")
+
     @staticmethod
     def _extract_domain_from_cookie(cookie_path: Path) -> str:
         """
@@ -553,6 +564,7 @@ class BaseTracker(ABC):
                 BaseTracker._last_request_time = time.monotonic()
 
             log.debug(f"{self.tracker}: Successfully fetched {request_type}")
+            self.save_cookies()
             return response.text
 
         except httpx.HTTPStatusError as e:
