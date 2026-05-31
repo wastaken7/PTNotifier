@@ -217,9 +217,21 @@ def format_for_discord(raw_description: str):
     )
 
     # 3. Handle Links: [text](url) - Discord only supports masked links in Embeds or specific contexts
+    def replace_link(match: re.Match[str]) -> str:
+        if match.group(1) is not None:
+            url = (match.group(1) or "").strip()
+            text = (match.group(2) or "").strip()
+        else:
+            url = (match.group(3) or "").strip()
+            text = (match.group(4) or "").strip()
+
+        if not text or text == url or text.lower().startswith(("http://", "https://")):
+            return url
+        return f"[{text}]({url})"
+
     raw_description = re.sub(
-        r'\[url=(.*?)\](.*?)\[/url\]|<a href="(.*?)">(.*?)</a>',
-        r"[\2\4](\1\3)",
+        r'\[url=(.*?)\](.*?)\[/url\]|<a\s+[^>]*href=["\'](.*?)["\'][^>]*>(.*?)</a>',
+        replace_link,
         raw_description,
         flags=re.IGNORECASE,
     )
