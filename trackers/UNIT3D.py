@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 from pathlib import Path
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Optional, override
 
 from bs4 import BeautifulSoup
 
@@ -15,6 +15,7 @@ class UNIT3D(BaseTracker):
     """
     Manages a session for UNIT3D based trackers.
     """
+
     def __init__(self, cookie_path: Path):
         self.cookie_path = cookie_path
         self.domain = self._extract_domain_from_cookie(cookie_path)
@@ -166,7 +167,12 @@ class UNIT3D(BaseTracker):
             )
         return items
 
-    def _parse_messages_html(self, soup: BeautifulSoup, include_read: bool = False, ignore_processed: bool = False) -> list[dict[str, Any]]:
+    def _parse_messages_html(
+        self,
+        soup: BeautifulSoup,
+        include_read: bool = False,
+        ignore_processed: bool = False,
+    ) -> list[dict[str, Any]]:
         """Parses the messages table for UNIT3D based trackers.
 
         Args:
@@ -198,7 +204,7 @@ class UNIT3D(BaseTracker):
             msg_url = link_tag["href"]
             if isinstance(msg_url, list):
                 msg_url = msg_url[0]
-            msg_id = f"msg_{str(msg_url).rstrip('/').split('/')[-1]}"
+            msg_id = f"msg_{msg_url.rstrip('/').split('/')[-1]}"
             if not ignore_processed and msg_id in self.state["processed_ids"]:
                 continue
 
@@ -209,7 +215,7 @@ class UNIT3D(BaseTracker):
                     "sender": sender,
                     "subject": subject,
                     "date": cols[2].get_text(strip=True),
-                    "url": str(msg_url),
+                    "url": msg_url,
                 }
             )
         return items
@@ -277,6 +283,7 @@ class UNIT3D(BaseTracker):
             log.error(f"{self.domain}: Exception marking as read:", exc_info=e)
             return False
 
+    @override
     async def _fetch_items(self) -> list[dict[str, Any]]:
         """Fetch all new items from the tracker and populate their bodies.
 
@@ -295,6 +302,7 @@ class UNIT3D(BaseTracker):
 
         return all_items
 
+    @override
     async def _fetch_test_item(self) -> Optional[dict[str, Any]]:
         """Fetches a test item from the tracker.
 
@@ -316,6 +324,7 @@ class UNIT3D(BaseTracker):
 
         return await self._populate_message_body(read_messages[0])
 
+    @override
     async def _ack_item(self, item: dict[str, Any]) -> None:
         """Marks an item as processed and read on the site.
 

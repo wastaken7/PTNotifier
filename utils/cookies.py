@@ -17,11 +17,13 @@ def valid_response(tracker: str, response: str, keyword: str) -> bool:
     """
     if keyword and keyword not in response:
         log.error(
-            f"{tracker}: [bold red]Request failed.\nPossible reasons: Expired cookies, IP ban, site maintenance, HTML change.\nKeyword '{keyword}' not found in the HTML response.[/bold red]"
+            f"{tracker}: [bold red]Request failed.\nPossible reasons: Expired cookies, IP ban, site maintenance, HTML change.\n"
+            f"Keyword '{keyword}' not found in the HTML response.[/bold red]"
         )
         save_html(tracker, response)
         return False
     return True
+
 
 def save_html(tracker: str, html_content: str) -> None:
     """

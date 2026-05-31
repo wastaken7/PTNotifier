@@ -91,22 +91,52 @@ def format_for_ntfy(raw_description: str) -> str:
         str: The converted description.
     """
     # Bold
-    raw_description = re.sub(r"\[b\](.*?)\[/b\]|<b>(.*?)</b>|<strong>(.*?)</strong>", r"**\1\2\3**", raw_description, flags=re.IGNORECASE)
+    raw_description = re.sub(
+        r"\[b\](.*?)\[/b\]|<b>(.*?)</b>|<strong>(.*?)</strong>",
+        r"**\1\2\3**",
+        raw_description,
+        flags=re.IGNORECASE,
+    )
 
     # Italic
-    raw_description = re.sub(r"\[i\](.*?)\[/i\]|<i>(.*?)</i>|<em>(.*?)</em>", r"*\1\2\3*", raw_description, flags=re.IGNORECASE)
+    raw_description = re.sub(
+        r"\[i\](.*?)\[/i\]|<i>(.*?)</i>|<em>(.*?)</em>",
+        r"*\1\2\3*",
+        raw_description,
+        flags=re.IGNORECASE,
+    )
 
     # Underline
-    raw_description = re.sub(r"\[u\](.*?)\[/u\]|<u>(.*?)</u>", r"__\1\2__", raw_description, flags=re.IGNORECASE)
+    raw_description = re.sub(
+        r"\[u\](.*?)\[/u\]|<u>(.*?)</u>",
+        r"__\1\2__",
+        raw_description,
+        flags=re.IGNORECASE,
+    )
 
     # Strikethrough
-    raw_description = re.sub(r"\[s\](.*?)\[/s\]|<s>(.*?)</s>|<strike>(.*?)</strike>", r"~~\1\2\3~~", raw_description, flags=re.IGNORECASE)
+    raw_description = re.sub(
+        r"\[s\](.*?)\[/s\]|<s>(.*?)</s>|<strike>(.*?)</strike>",
+        r"~~\1\2\3~~",
+        raw_description,
+        flags=re.IGNORECASE,
+    )
 
     # Links
-    raw_description = re.sub(r'\[url=(.*?)\](.*?)\[/url\]|<a href="(.*?)">(.*?)</a>', r"[\2\4](\1\3)", raw_description, flags=re.IGNORECASE)
+    raw_description = re.sub(
+        r'\[url=(.*?)\](.*?)\[/url\]|<a href="(.*?)">(.*?)</a>',
+        r"[\2\4](\1\3)",
+        raw_description,
+        flags=re.IGNORECASE,
+    )
 
     # Code
-    raw_description = re.sub(r"\[code\](.*?)\[/code\]|<code>(.*?)</code>", r"`\1\2`", raw_description, flags=re.IGNORECASE)
+    raw_description = re.sub(
+        r"\[code\](.*?)\[/code\]|<code>(.*?)</code>",
+        r"`\1\2`",
+        raw_description,
+        flags=re.IGNORECASE,
+    )
 
     # Remove any remaining BBcode or HTML code
     raw_description = re.sub(r"<.*?>", "", raw_description)

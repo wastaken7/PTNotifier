@@ -3,7 +3,7 @@
 import json
 import re
 from pathlib import Path
-from typing import Any
+from typing import Any, override
 from urllib.parse import urljoin
 
 from utils.console import log
@@ -26,6 +26,7 @@ class DigitalCore(BaseTracker):
 
         self.mailbox_api = urljoin(self.base_url, "/api/v1/mailbox?index=0&limit=20&location=0")
 
+    @override
     async def _fetch_items(self) -> list[dict[str, Any]]:
         """
         Fetch messages from DigitalCore API.

@@ -129,7 +129,11 @@ async def send_discord(
                 async with aiofiles.open(str(icon_path), "rb") as f:
                     content = await f.read()
                     files = {"file": (icon_filename, content, "image/png")}
-                    resp = await client.post(webhook_url, data={"payload_json": json.dumps(payload)}, files=files)
+                    resp = await client.post(
+                        webhook_url,
+                        data={"payload_json": json.dumps(payload)},
+                        files=files,
+                    )
             else:
                 resp = await client.post(webhook_url, json=payload)
 
@@ -173,25 +177,60 @@ def format_for_discord(raw_description: str):
         str: The converted description.
     """
     # Bold
-    raw_description = re.sub(r"\[b\](.*?)\[/b\]|<b>(.*?)</b>|<strong>(.*?)</strong>", r"**\1\2\3**", raw_description, flags=re.IGNORECASE)
+    raw_description = re.sub(
+        r"\[b\](.*?)\[/b\]|<b>(.*?)</b>|<strong>(.*?)</strong>",
+        r"**\1\2\3**",
+        raw_description,
+        flags=re.IGNORECASE,
+    )
 
     # Italic
-    raw_description = re.sub(r"\[i\](.*?)\[/i\]|<i>(.*?)</i>|<em>(.*?)</em>", r"*\1\2\3*", raw_description, flags=re.IGNORECASE)
+    raw_description = re.sub(
+        r"\[i\](.*?)\[/i\]|<i>(.*?)</i>|<em>(.*?)</em>",
+        r"*\1\2\3*",
+        raw_description,
+        flags=re.IGNORECASE,
+    )
 
     # Underline
-    raw_description = re.sub(r"\[u\](.*?)\[/u\]|<u>(.*?)</u>", r"__\1\2__", raw_description, flags=re.IGNORECASE)
+    raw_description = re.sub(
+        r"\[u\](.*?)\[/u\]|<u>(.*?)</u>",
+        r"__\1\2__",
+        raw_description,
+        flags=re.IGNORECASE,
+    )
 
     # Strikethrough
-    raw_description = re.sub(r"\[s\](.*?)\[/s\]|<s>(.*?)</s>|<strike>(.*?)</strike>", r"~~\1\2\3~~", raw_description, flags=re.IGNORECASE)
+    raw_description = re.sub(
+        r"\[s\](.*?)\[/s\]|<s>(.*?)</s>|<strike>(.*?)</strike>",
+        r"~~\1\2\3~~",
+        raw_description,
+        flags=re.IGNORECASE,
+    )
 
     # 2. Handle Spoilers
-    raw_description = re.sub(r"\[spoiler\](.*?)\[/spoiler\]|<tg-spoiler>(.*?)</tg-spoiler>|<spoiler>(.*?)</spoiler>", r"||\1\2\3||", raw_description, flags=re.IGNORECASE)
+    raw_description = re.sub(
+        r"\[spoiler\](.*?)\[/spoiler\]|<tg-spoiler>(.*?)</tg-spoiler>|<spoiler>(.*?)</spoiler>",
+        r"||\1\2\3||",
+        raw_description,
+        flags=re.IGNORECASE,
+    )
 
     # 3. Handle Links: [text](url) - Discord only supports masked links in Embeds or specific contexts
-    raw_description = re.sub(r'\[url=(.*?)\](.*?)\[/url\]|<a href="(.*?)">(.*?)</a>', r"[\2\4](\1\3)", raw_description, flags=re.IGNORECASE)
+    raw_description = re.sub(
+        r'\[url=(.*?)\](.*?)\[/url\]|<a href="(.*?)">(.*?)</a>',
+        r"[\2\4](\1\3)",
+        raw_description,
+        flags=re.IGNORECASE,
+    )
 
     # 4. Handle Code
-    raw_description = re.sub(r"\[code\](.*?)\[/code\]|<code>(.*?)</code>", r"`\1\2`", raw_description, flags=re.IGNORECASE)
+    raw_description = re.sub(
+        r"\[code\](.*?)\[/code\]|<code>(.*?)</code>",
+        r"`\1\2`",
+        raw_description,
+        flags=re.IGNORECASE,
+    )
 
     # 5. Remove any remaining BBcode or HTML code
     raw_description = re.sub(r"<.*?>", "", raw_description)

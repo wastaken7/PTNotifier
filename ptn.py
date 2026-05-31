@@ -14,7 +14,17 @@ from utils.config_validator import load_config
 from utils.console import log
 from utils.tracker_loader import load_trackers
 
-user_config, api_tokens, discord_webhook_url, telegram_bot_token, telegram_chat_id, gotify_url, gotify_token, ntfy_url, ntfy_topic = load_config()
+(
+    user_config,
+    api_tokens,
+    discord_webhook_url,
+    telegram_bot_token,
+    telegram_chat_id,
+    gotify_url,
+    gotify_token,
+    ntfy_url,
+    ntfy_topic,
+) = load_config()
 
 
 def parse_args() -> argparse.Namespace:
@@ -108,13 +118,15 @@ async def run_test_notification(tracker_classes: dict[str, Any], target_trackers
         candidates = [
             (tracker_name, tracker_instance)
             for tracker_name, tracker_instance in candidates
-            if normalized_targets.intersection({
-                tracker_name.lower(),
-                tracker_instance.tracker.lower(),
-                tracker_instance.__class__.__name__.lower(),
-                getattr(tracker_instance, "domain", "").lower(),
-                Path(getattr(tracker_instance, "filename", "")).stem.lower(),
-            })
+            if normalized_targets.intersection(
+                {
+                    tracker_name.lower(),
+                    tracker_instance.tracker.lower(),
+                    tracker_instance.__class__.__name__.lower(),
+                    getattr(tracker_instance, "domain", "").lower(),
+                    Path(getattr(tracker_instance, "filename", "")).stem.lower(),
+                }
+            )
         ]
 
     if not candidates:
@@ -146,7 +158,9 @@ async def main(args: argparse.Namespace):
     tracker_classes = load_trackers()
 
     if args.test_notification is not None:
-        target_trackers = None if args.test_notification == "__FIRST__" else parse_test_notification_targets(args.test_notification)
+        target_trackers = (
+            None if args.test_notification == "__FIRST__" else parse_test_notification_targets(args.test_notification)
+        )
         return await run_test_notification(tracker_classes, target_trackers)
 
     cookies_dir = Path("./cookies")
@@ -222,7 +236,11 @@ async def main(args: argparse.Namespace):
                 completed_count += 1
                 tracker_name, result = await future
 
-                progress.update(main_task, description=f"[bold blue]Processing {tracker_name} [[cyan]{completed_count:02d}/{total_tasks:02d}[/cyan]]", advance=1)
+                progress.update(
+                    main_task,
+                    description=f"[bold blue]Processing {tracker_name} [[cyan]{completed_count:02d}/{total_tasks:02d}[/cyan]]",
+                    advance=1,
+                )
 
                 if result and result > 0:
                     results.append(result)

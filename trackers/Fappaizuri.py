@@ -2,7 +2,7 @@
 
 import re
 from pathlib import Path
-from typing import Any
+from typing import Any, override
 from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup, Tag
@@ -23,6 +23,7 @@ class Fappaizuri(BaseTracker):
         )
         self.inbox_url = urljoin(self.base_url, "mailbox.php?inbox")
 
+    @override
     async def _fetch_items(self) -> list[dict[str, Any]]:
         """Fetch messages from Fappaizuri mailbox.
 
@@ -43,8 +44,7 @@ class Fappaizuri(BaseTracker):
         message_rows = soup.find_all("tr")
 
         valid_rows: list[Tag] = [
-            row for row in message_rows
-            if row and row.find("input", attrs={"name": re.compile(r"msgs\[\d+\]")})
+            row for row in message_rows if row and row.find("input", attrs={"name": re.compile(r"msgs\[\d+\]")})
         ]
 
         for header_row in valid_rows:
@@ -93,15 +93,17 @@ class Fappaizuri(BaseTracker):
                 if isinstance(body_div, Tag):
                     body = body_div.get_text(separator="\n", strip=True)
 
-            new_items.append({
-                "type": "message",
-                "id": item_id,
-                "title": sender,
-                "subject": subject,
-                "body": body,
-                "date": date_str,
-                "url": url,
-                "is_staff": sender.lower() == "system",
-            })
+            new_items.append(
+                {
+                    "type": "message",
+                    "id": item_id,
+                    "title": sender,
+                    "subject": subject,
+                    "body": body,
+                    "date": date_str,
+                    "url": url,
+                    "is_staff": sender.lower() == "system",
+                }
+            )
 
         return new_items

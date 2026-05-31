@@ -3,7 +3,7 @@
 import json
 import re
 from pathlib import Path
-from typing import Any
+from typing import Any, override
 from urllib.parse import urljoin
 
 import config
@@ -32,6 +32,7 @@ class Orpheus(BaseTracker):
         self.inbox_api = urljoin(self.base_url, "ajax.php?action=inbox")
         self.conv_api = urljoin(self.base_url, "ajax.php?action=inbox&type=viewconv&id=")
 
+    @override
     async def _fetch_items(self) -> list[dict[str, Any]]:
         """Fetch messages from Orpheus API.
 

@@ -3,7 +3,7 @@
 import json
 import re
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, override
 from urllib.parse import urljoin
 
 import config
@@ -29,6 +29,7 @@ class Anthelion(BaseTracker):
         self.api_key = config.API_TOKENS.get("Anthelion")
         self.inbox_api = f"{self.base_url}api.php?action=inbox&api_key={self.api_key}"
 
+    @override
     async def _fetch_items(self) -> list[dict[str, Any]]:
         """
         Fetch messages from the Anthelion API.
@@ -42,6 +43,7 @@ class Anthelion(BaseTracker):
 
         return await self._fetch_inbox()
 
+    @override
     async def _fetch_test_item(self) -> Optional[dict[str, Any]]:
         """
         Fetch a single test item (the first unread message or first read message if no unread).
@@ -108,7 +110,11 @@ class Anthelion(BaseTracker):
                     body = ""
                 else:
                     body = re.sub(r"\[\[([^\]]+)\]\]", r"\1", body)
-                    body = re.sub(r"\[torrent\]([^\[]+)\[/torrent\]", r"https://anthelion.me/torrents.php?id=\1", body)
+                    body = re.sub(
+                        r"\[torrent\]([^\[]+)\[/torrent\]",
+                        r"https://anthelion.me/torrents.php?id=\1",
+                        body,
+                    )
                     body = re.sub(r"\[/?[^\]]+\]", "", body).strip()
                 date = msg.get("sent_date", "")
                 link = urljoin(self.base_url, f"inbox.php?action=viewconv&id={conv_id}")

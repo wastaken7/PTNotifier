@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 from pathlib import Path
-from typing import Any
+from typing import Any, override
 from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup
@@ -27,6 +27,7 @@ class BJShare(BaseTracker):
         self.inbox_url = urljoin(self.base_url, "inbox.php?sort=unread")
         self.staff_url = urljoin(self.base_url, "staffpm.php")
 
+    @override
     async def _fetch_items(self) -> list[dict[str, Any]]:
         """
         Fetch standard inbox and staff messages.
@@ -38,6 +39,7 @@ class BJShare(BaseTracker):
         staff_items = await self._parse_messages(self.staff_url, is_staff=True)
         return inbox_items + staff_items
 
+    @override
     async def _fetch_test_item(self) -> dict[str, Any] | None:
         """
         Fetch one test item from the tracker.
@@ -49,7 +51,12 @@ class BJShare(BaseTracker):
         if unread_items:
             return unread_items[0]
 
-        read_items = await self._parse_messages(urljoin(self.base_url, "inbox.php"), is_staff=False, include_read=True, ignore_processed=True)
+        read_items = await self._parse_messages(
+            urljoin(self.base_url, "inbox.php"),
+            is_staff=False,
+            include_read=True,
+            ignore_processed=True,
+        )
         if read_items:
             return read_items[0]
 
@@ -59,7 +66,13 @@ class BJShare(BaseTracker):
 
         return None
 
-    async def _parse_messages(self, url: str, is_staff: bool, include_read: bool = False, ignore_processed: bool = False) -> list[dict[str, Any]]:
+    async def _parse_messages(
+        self,
+        url: str,
+        is_staff: bool,
+        include_read: bool = False,
+        ignore_processed: bool = False,
+    ) -> list[dict[str, Any]]:
         """
         Parses unread message rows and triggers body fetching.
 

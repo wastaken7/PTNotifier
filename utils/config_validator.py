@@ -3,7 +3,17 @@ from typing import Any
 from utils.console import log
 
 
-def load_config() -> tuple[dict[str, Any], dict[str, str], str | None, str | None, str | None, str | None, str | None, str | None, str | None]:
+def load_config() -> tuple[
+    dict[str, Any],
+    dict[str, str],
+    str | None,
+    str | None,
+    str | None,
+    str | None,
+    str | None,
+    str | None,
+    str | None,
+]:
     """
     Load configuration from config.py.
 
@@ -40,7 +50,9 @@ def load_config() -> tuple[dict[str, Any], dict[str, str], str | None, str | Non
         ntfy_url = user_config.get("NTFY_URL")
         ntfy_topic = user_config.get("NTFY_TOPIC")
         if "IGNORE_STRING" not in user_config:
-            user_config["IGNORE_STRING"] = {}
+            user_config["IGNORE_STRING"] = {
+                "https://example.com/": ["torrent deleted", "your class has changed"],
+            }
 
     except Exception as e:
         log.error(f"Error loading config.py: {e}")
@@ -54,8 +66,20 @@ def load_config() -> tuple[dict[str, Any], dict[str, str], str | None, str | Non
     has_ntfy = ntfy_url and ntfy_topic
 
     if not has_telegram and not has_discord and not has_gotify and not has_ntfy:
-        log.error("Please set TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID, DISCORD_WEBHOOK_URL, GOTIFY_URL and GOTIFY_TOKEN, or NTFY_URL and NTFY_TOPIC in config.py")
+        log.error(
+            "Please set TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID, DISCORD_WEBHOOK_URL, "
+            "GOTIFY_URL and GOTIFY_TOKEN, or NTFY_URL and NTFY_TOPIC in config.py"
+        )
         exit(1)
 
-    return user_config, api_tokens, discord_webhook_url, telegram_bot_token, telegram_chat_id, gotify_url, gotify_token, ntfy_url, ntfy_topic
-
+    return (
+        user_config,
+        api_tokens,
+        discord_webhook_url,
+        telegram_bot_token,
+        telegram_chat_id,
+        gotify_url,
+        gotify_token,
+        ntfy_url,
+        ntfy_topic,
+    )

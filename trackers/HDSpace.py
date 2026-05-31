@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 from pathlib import Path
-from typing import Any
+from typing import Any, override
 from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup
@@ -23,6 +23,7 @@ class HDSpace(BaseTracker):
             base_url="https://hd-space.org/",
         )
 
+    @override
     async def _fetch_items(self) -> list[dict[str, Any]]:
         """Fetch messages from HD-Space mailbox.
 

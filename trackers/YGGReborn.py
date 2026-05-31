@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 from pathlib import Path
-from typing import Any
+from typing import Any, override
 from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup
@@ -25,6 +25,7 @@ class YGGReborn(BaseTracker):
         )
         self.inbox_url = urljoin(self.base_url, "inbox/")
 
+    @override
     async def _fetch_items(self) -> list[dict[str, Any]]:
         """
         Fetch unread messages from the inbox.
@@ -85,7 +86,11 @@ class YGGReborn(BaseTracker):
 
         soup = BeautifulSoup(response, "html.parser")
 
-        meta_p = soup.find("p", class_="text-xs", style=lambda x: bool(x and "var(--text-dark-light)" in x))
+        meta_p = soup.find(
+            "p",
+            class_="text-xs",
+            style=lambda x: bool(x and "var(--text-dark-light)" in x),
+        )
         sender = "System"
         date_str = "Unknown"
 

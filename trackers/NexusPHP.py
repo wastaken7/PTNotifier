@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 from pathlib import Path
-from typing import Any
+from typing import Any, override
 from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup
@@ -24,6 +24,7 @@ class NexusPHP(BaseTracker):
         )
         self.inbox_url = urljoin(self.base_url, "messages.php?action=viewmailbox&box=1&unread=yes")
 
+    @override
     async def _fetch_items(self) -> list[dict[str, Any]]:
         """Fetch messages from NexusPHP inbox.
 
@@ -33,6 +34,7 @@ class NexusPHP(BaseTracker):
         inbox_items = await self._parse_messages(self.inbox_url)
         return inbox_items
 
+    @override
     async def _fetch_test_item(self) -> dict[str, Any] | None:
         """Fetch a test item from the tracker.
 
@@ -43,7 +45,11 @@ class NexusPHP(BaseTracker):
         if unread_items:
             return unread_items[0]
 
-        read_items = await self._parse_messages(urljoin(self.base_url, "messages.php?action=viewmailbox&box=1"), include_read=True, ignore_processed=True)
+        read_items = await self._parse_messages(
+            urljoin(self.base_url, "messages.php?action=viewmailbox&box=1"),
+            include_read=True,
+            ignore_processed=True,
+        )
         if read_items:
             return read_items[0]
 

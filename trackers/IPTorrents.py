@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 from pathlib import Path
-from typing import Any
+from typing import Any, override
 from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup
@@ -24,6 +24,7 @@ class IPTorrents(BaseTracker):
         )
         self.inbox_url = urljoin(self.base_url, "inbox")
 
+    @override
     async def _fetch_items(self) -> list[dict[str, Any]]:
         """Fetch messages from IPTorrents inbox.
 

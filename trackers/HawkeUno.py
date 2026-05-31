@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 from pathlib import Path
-from typing import Any
+from typing import Any, override
 
 from bs4 import BeautifulSoup
 
@@ -30,6 +30,7 @@ class HawkeUno(UNIT3D):
             username = user_tag.get_text(strip=True)
             self.state["username"] = username
 
+    @override
     def _parse_notifications_html(self, soup: BeautifulSoup) -> list[dict[str, Any]]:
         """
         Parse notifications from HTML.
@@ -77,7 +78,13 @@ class HawkeUno(UNIT3D):
             )
         return items
 
-    def _parse_messages_html(self, soup: BeautifulSoup, include_read: bool = False, ignore_processed: bool = False) -> list[dict[str, Any]]:
+    @override
+    def _parse_messages_html(
+        self,
+        soup: BeautifulSoup,
+        include_read: bool = False,
+        ignore_processed: bool = False,
+    ) -> list[dict[str, Any]]:
         """
         Parse messages from HTML.
 

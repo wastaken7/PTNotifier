@@ -117,7 +117,10 @@ class BaseTracker(ABC):
             except Exception:
                 return {"processed_ids": [], "last_run": 0}
         else:
-            log.warning(f"{self.tracker}: No existing state file found. There won't be any notifications on the first run to avoid spamming.")
+            log.warning(
+                f"{self.tracker}: No existing state file found. "
+                "There won't be any notifications on the first run to avoid spamming."
+            )
             self.first_run = True
             self.state = {"processed_ids": [], "last_run": 0}
             self._save_state()
@@ -147,7 +150,9 @@ class BaseTracker(ABC):
             if len(self.state["processed_ids"]) > 300:
                 self.state["processed_ids"] = self.state["processed_ids"][-300:]
 
-    def _collect_notifiers(self) -> list[Callable[[dict[str, Any], str, str, str], Coroutine[Any, Any, None]]]:
+    def _collect_notifiers(
+        self,
+    ) -> list[Callable[[dict[str, Any], str, str, str], Coroutine[Any, Any, None]]]:
         """
         Collects all enabled notifiers from the configuration.
 
@@ -276,7 +281,7 @@ class BaseTracker(ABC):
         Returns:
             bool: True if the item should be ignored, False otherwise.
         """
-        ignore_config: dict[str, list[str]]  = config.SETTINGS.get("IGNORE_STRING", {})
+        ignore_config: dict[str, list[str]] = config.SETTINGS.get("IGNORE_STRING", {})
 
         # Check for both base_url with and without trailing slash
         url_with_slash = self.base_url if self.base_url.endswith("/") else self.base_url + "/"
@@ -325,7 +330,7 @@ class BaseTracker(ABC):
         original_processed_ids = list(self.state.get("processed_ids", []))
 
         try:
-            self.state["processed_ids"] = []
+            self.state["processed_ids"] = [""]
             items = await self._fetch_items()
         finally:
             self.state["processed_ids"] = original_processed_ids
@@ -434,4 +439,3 @@ class BaseTracker(ABC):
             log.debug("Error details", exc_info=True)
 
         return ""
-

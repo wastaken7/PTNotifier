@@ -1,0 +1,25 @@
+[tool.ruff]
+target-version = "py314"
+
+line-length = 130
+
+exclude = [
+    ".git",
+    ".github",
+    ".ruff_cache",
+    ".venv",
+    "__pycache__",
+    "cookies",
+    "state",
+    "debug",
+]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+ignore = []
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"

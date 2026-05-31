@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 from pathlib import Path
-from typing import Any
+from typing import Any, override
 from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup
@@ -24,6 +24,7 @@ class TorrentDay(BaseTracker):
         )
         self.inbox_url = "https://www.torrentday.com/m"
 
+    @override
     async def _fetch_items(self) -> list[dict[str, Any]]:
         """Fetch messages from TorrentDay inbox.
 
@@ -33,6 +34,7 @@ class TorrentDay(BaseTracker):
         inbox_items = await self._parse_messages(self.inbox_url)
         return inbox_items
 
+    @override
     async def _fetch_test_item(self) -> dict[str, Any] | None:
         """Fetch a test item from the tracker.
 

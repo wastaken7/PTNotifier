@@ -5,3 +5,4 @@ debug/
 config.py
 .vscode/
 .venv/
+.ruff_cache/

@@ -8,6 +8,7 @@ from utils.console import console, log
 
 last_check_time = 0.0
 
+
 async def check_version():
     """
     Checks for new commits on GitHub by comparing the local HEAD with the remote main branch.
@@ -49,7 +50,14 @@ async def check_version():
 
             message += "\n[cyan]Run 'git pull' to stay up to date.[/cyan]"
 
-            console.print(Panel(message, title="Update Available", border_style="bold green", expand=False))
+            console.print(
+                Panel(
+                    message,
+                    title="Update Available",
+                    border_style="bold green",
+                    expand=False,
+                )
+            )
         else:
             log.debug("No new updates found. You are up to date.")
 

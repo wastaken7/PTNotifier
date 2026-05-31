@@ -2,7 +2,7 @@
 
 import re
 from pathlib import Path
-from typing import Any
+from typing import Any, override
 from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup
@@ -25,6 +25,7 @@ class ImmortalSeed(BaseTracker):
         )
         self.inbox_url = urljoin(self.base_url, "messages.php")
 
+    @override
     async def _fetch_items(self) -> list[dict[str, Any]]:
         """Fetch messages from ImmortalSeed inbox.
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 from pathlib import Path
-from typing import Any
+from typing import Any, override
 from urllib.parse import urljoin
 
 import httpx
@@ -25,6 +25,7 @@ class AmigosShareClub(BaseTracker):
         )
         self.inbox_url = "https://cliente.amigos-share.club/mensagens.php?do=n_lidas"
 
+    @override
     async def _fetch_items(self) -> list[dict[str, Any]]:
         """
         Fetch messages from ASC inbox and include their bodies.
@@ -39,6 +40,7 @@ class AmigosShareClub(BaseTracker):
 
         return inbox_items
 
+    @override
     async def _fetch_test_item(self) -> dict[str, Any] | None:
         """
         Fetch a single test item (the first unread message or first read message if no unread).

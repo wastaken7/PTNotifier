@@ -2,7 +2,7 @@
 
 import re
 from pathlib import Path
-from typing import Any
+from typing import Any, override
 from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup
@@ -22,9 +22,16 @@ class HDTorrents(BaseTracker):
             cookie_path,
             tracker_name="HD-Torrents",
             base_url="https://hd-torrents.org/",
-            custom_headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"},
+            custom_headers={
+                "User-Agent": (
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/120.0.0.0 Safari/537.36"
+                )
+            },
         )
 
+    @override
     async def _fetch_items(self) -> list[dict[str, Any]]:
         """Fetch messages from HD-Torrents mailbox.
 
@@ -38,7 +45,7 @@ class HDTorrents(BaseTracker):
                 user_cp_link = soup.find("a", href=lambda h: bool(h and "usercp.php?uid=" in h))
                 if user_cp_link:
                     href = str(user_cp_link.get("href", ""))
-                    match = re.search(r'uid=(\d+)', href)
+                    match = re.search(r"uid=(\d+)", href)
                     if match:
                         uid = match.group(1)
                         inbox_path = f"usercp.php?uid={uid}&do=pm&action=list"

@@ -2,7 +2,7 @@
 
 import copy
 from pathlib import Path
-from typing import Any
+from typing import Any, override
 from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup
@@ -26,6 +26,7 @@ class SceneTime(BaseTracker):
         )
         self.inbox_url = urljoin(self.base_url, "inbox.php")
 
+    @override
     async def _fetch_items(self) -> list[dict[str, Any]]:
         """Fetch messages from SceneTime inbox.
 
@@ -35,6 +36,7 @@ class SceneTime(BaseTracker):
         inbox_items = await self._parse_messages(self.inbox_url)
         return inbox_items
 
+    @override
     async def _fetch_test_item(self) -> dict[str, Any] | None:
         """Fetch a test item from the tracker.
 

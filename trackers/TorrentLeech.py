@@ -2,7 +2,7 @@
 
 import re
 from pathlib import Path
-from typing import Any
+from typing import Any, override
 from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup
@@ -24,6 +24,7 @@ class TorrentLeech(BaseTracker):
             base_url="https://www.torrentleech.org/",
         )
 
+    @override
     async def _fetch_items(self) -> list[dict[str, Any]]:
         """Fetch notifications from TorrentLeech profile.
 
@@ -34,7 +35,11 @@ class TorrentLeech(BaseTracker):
             response = await self._fetch_page(self.base_url, "user ID")
             soup = BeautifulSoup(response, "html.parser")
             if soup:
-                profile_link = soup.find("span", class_="link", onclick=lambda x: bool(x and "/profile/" in x))
+                profile_link = soup.find(
+                    "span",
+                    class_="link",
+                    onclick=lambda x: bool(x and "/profile/" in x),
+                )
                 if profile_link:
                     onclick_attr = str(profile_link.get("onclick", ""))
                     match = re.search(r"/profile/([^/]+)/", onclick_attr)

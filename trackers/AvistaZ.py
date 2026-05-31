@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 from pathlib import Path
-from typing import Any
+from typing import Any, override
 
 from bs4 import BeautifulSoup
 
@@ -44,6 +44,7 @@ class AvistaZ(BaseTracker):
         else:
             return "https://avistaz.to/images/avistaz-favicon.png"
 
+    @override
     async def _fetch_items(self) -> list[dict[str, Any]]:
         """
         Fetch all new items from the tracker.
@@ -55,6 +56,7 @@ class AvistaZ(BaseTracker):
         messages = await self._fetch_and_parse_messages()
         return notifications + messages
 
+    @override
     async def _fetch_test_item(self) -> dict[str, Any] | None:
         """
         Fetch a single test item (the first unread message or first read message if no unread).

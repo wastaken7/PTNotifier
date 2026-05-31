@@ -2,7 +2,7 @@
 
 import re
 from pathlib import Path
-from typing import Any
+from typing import Any, override
 from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup
@@ -24,6 +24,7 @@ class BTArg(BaseTracker):
             base_url="https://www.btarg.com.ar/tracker/",
         )
 
+    @override
     async def _fetch_items(self) -> list[dict[str, Any]]:
         """Fetch messages from BTArg mailbox.
 
@@ -77,7 +78,7 @@ class BTArg(BaseTracker):
             link = urljoin(self.base_url, str(href))
 
             # Extracts the message ID from the URL (ex: id=1993382)
-            match_id = re.search(r'id=(\d+)', link)
+            match_id = re.search(r"id=(\d+)", link)
             item_id = match_id.group(1) if match_id else link
 
             if item_id in self.state["processed_ids"]:
