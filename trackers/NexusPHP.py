@@ -144,7 +144,7 @@ class NexusPHP(BaseTracker):
             for td in all_tds:
                 parent_table = td.find_parent("table")
                 if parent_table and parent_table.get("width") == "737":
-                    return td.get_text(separator="\n\n", strip=True)
+                    return str(td)
 
             return ""
         except Exception as e:

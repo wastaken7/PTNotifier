@@ -198,7 +198,7 @@ class AvistaZ(BaseTracker):
 
             body_div = soup.find("div", class_="torrent-desc")
             if body_div:
-                return body_div.get_text(separator="\n\n", strip=True)
+                return str(body_div)
 
             return "No content found."
         except Exception as e:

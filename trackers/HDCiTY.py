@@ -69,7 +69,7 @@ class HDCiTY(BaseTracker):
                 "div",
                 style=lambda x: bool(x and "border:#89a 1px dashed;margin:6px;padding:6px;" in x),
             )
-            body = body_tag.get_text(strip=True) if body_tag else ""
+            body = body_tag
 
             cells = row.find_all("td", class_="rowfollow")
             sender = "System"

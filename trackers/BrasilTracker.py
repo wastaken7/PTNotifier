@@ -163,7 +163,7 @@ class BrasilTracker(BaseTracker):
                 if date_span:
                     date_str = date_span.get_text(strip=True)
 
-            body_text = body_div.get_text("\n\n", strip=True)
+            body_text = body_div if body_div else "No content"
 
             messages_found.append(
                 {

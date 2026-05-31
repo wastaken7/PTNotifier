@@ -167,7 +167,7 @@ class GreatPosterWall(BaseTracker):
                 if date_span:
                     date_str = date_span.get_text(strip=True)
 
-            body_text = body_div.get_text("\n\n", strip=True)
+            body_text = body_div
 
             messages_found.append(
                 {

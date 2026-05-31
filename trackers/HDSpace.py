@@ -135,7 +135,7 @@ class HDSpace(BaseTracker):
                         if next_row:
                             body_cell = next_row.find("td", class_="lista")
                             if body_cell:
-                                body_content = body_cell.get_text(separator="\n\n", strip=True)
+                                body_content = str(body_cell)
                                 break
 
             return body_content

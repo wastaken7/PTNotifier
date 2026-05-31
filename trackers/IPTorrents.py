@@ -119,13 +119,12 @@ class IPTorrents(BaseTracker):
             if "Fs" in data:
                 for instruction in data["Fs"]:
                     if instruction[0] == "DOM" and ".msgBody" in str(instruction[1]):
-                        cmd: list[Any] = []
                         for cmd in instruction[1]:
-                            if cmd and cmd[0] == "html":
+                            if cmd and isinstance(cmd, list) and cmd[0] == "html":
                                 body_soup = BeautifulSoup(cmd[1], "html.parser")
                                 body_el = body_soup.find("blockquote", class_="body")
                                 if body_el:
-                                    return body_el.get_text(separator="\n\n", strip=True)
+                                    return str(body_el)
             return ""
         except Exception as e:
             log.error(f"{self.tracker}: API Error for {item_id}: {e}")

@@ -254,6 +254,8 @@ class BaseTracker(ABC):
 
         try:
             all_items: list[dict[str, Any]] = await self._fetch_items()
+            for item in all_items:
+                self._post_process_item(item)
 
             for item in all_items:
                 if not self.first_run:
@@ -270,6 +272,68 @@ class BaseTracker(ABC):
             log.debug("Processing error details", exc_info=True)
         finally:
             await self.client.aclose()
+
+    def _clean_html(self, element: Any) -> str:
+        """
+        Converts a BeautifulSoup element (Tag) into a clean HTML string
+        where <br> tags are replaced with newlines, relative urls are made absolute,
+        and only formatting-related HTML tags are preserved.
+        """
+        if element is None:
+            return ""
+
+        from urllib.parse import urljoin
+
+        def parse_node(node: Any) -> str:
+            if getattr(node, "name", None) is None:
+                return str(node)
+
+            tag_name = node.name.lower()
+            if tag_name == "br":
+                return "\n"
+
+            children_text = "".join(parse_node(child) for child in node.children)
+
+            if tag_name in ("p", "div", "li", "h1", "h2", "h3", "h4", "h5", "h6", "ul", "ol"):
+                return f"\n{children_text}\n"
+
+            if tag_name == "a":
+                href = node.get("href", "")
+                if href:
+                    absolute_href = urljoin(self.base_url, href)
+                    return f'<a href="{absolute_href}">{children_text}</a>'
+                return children_text
+
+            elif tag_name in ("b", "strong", "i", "em", "u", "s", "strike", "spoiler", "tg-spoiler", "code"):
+                return f"<{tag_name}>{children_text}</{tag_name}>"
+
+            return children_text
+
+        raw_result = "".join(parse_node(child) for child in element.children)
+
+        # Normalize whitespace and newlines
+        cleaned_lines = [line.strip() for line in raw_result.split("\n")]
+        import re
+
+        result = "\n".join(cleaned_lines)
+        result = re.sub(r"\n{3,}", "\n\n", result)
+
+        return result.strip()
+
+    def _post_process_item(self, item: dict[str, Any]) -> None:
+        """
+        Post-processes a fetched item, converting any BeautifulSoup Tag or HTML
+        string inside the 'body' field into a clean, formatted text string.
+        """
+        if "body" in item:
+            body = item["body"]
+            if body is not None and not isinstance(body, str):
+                item["body"] = self._clean_html(body)
+            elif isinstance(body, str) and ("<" in body and ">" in body):
+                from bs4 import BeautifulSoup
+
+                soup = BeautifulSoup(body, "html.parser")
+                item["body"] = self._clean_html(soup)
 
     def _should_ignore(self, item: dict[str, Any]) -> bool:
         """
@@ -316,6 +380,8 @@ class BaseTracker(ABC):
         """
         items = await self._fetch_items()
         if items:
+            for item in items:
+                self._post_process_item(item)
             return items[0]
 
         return await self._fetch_processed_test_item()
@@ -332,6 +398,8 @@ class BaseTracker(ABC):
         try:
             self.state["processed_ids"] = [""]
             items = await self._fetch_items()
+            for item in items:
+                self._post_process_item(item)
         finally:
             self.state["processed_ids"] = original_processed_ids
 

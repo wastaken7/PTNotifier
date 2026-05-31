@@ -107,7 +107,7 @@ class SceneTime(BaseTracker):
                 if controls:
                     controls.decompose()
 
-                body = temp_soup.get_text(separator="\n", strip=True)
+                body = temp_soup
 
             link = urljoin(self.base_url, f"inbox.php?id={item_id}")
 

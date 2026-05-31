@@ -122,7 +122,7 @@ class BTArg(BaseTracker):
 
             body_div = soup.find("div", style=lambda s: bool(s and "overflow:auto" in s))
             if body_div:
-                return body_div.get_text(separator="\n", strip=True)
+                return str(body_div)
 
             return ""
         except Exception as e:

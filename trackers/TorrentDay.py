@@ -137,7 +137,7 @@ class TorrentDay(BaseTracker):
                 last_container = message_containers[-1]
                 body_div = last_container.find("div", class_="postContents")
                 if body_div:
-                    return body_div.get_text(separator="\n\n", strip=True)
+                    return str(body_div)
 
             return ""
         except Exception as e:

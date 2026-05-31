@@ -234,6 +234,6 @@ def format_for_discord(raw_description: str):
 
     # 5. Remove any remaining BBcode or HTML code
     raw_description = re.sub(r"<.*?>", "", raw_description)
-    raw_description = re.sub(r"\[.*?\]", "", raw_description)
+    raw_description = re.sub(r"\[(?![^\]]*\]\()([^\]]*)\]", "", raw_description)
 
     return raw_description

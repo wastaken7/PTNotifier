@@ -141,7 +141,7 @@ class HDTorrents(BaseTracker):
                         if next_row:
                             body_cell = next_row.find("td")
                             if body_cell:
-                                return body_cell.get_text(separator="\n\n", strip=True)
+                                return str(body_cell)
 
             return ""
         except Exception as e:

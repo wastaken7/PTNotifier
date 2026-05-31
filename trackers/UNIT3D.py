@@ -233,14 +233,14 @@ class UNIT3D(BaseTracker):
             item["body"] = await self._fetch_body(item["url"])
         return item
 
-    async def _fetch_body(self, url: str) -> str:
+    async def _fetch_body(self, url: str) -> Any:
         """Fetches the content of the last message/comment from a specific page.
 
         Args:
             url (str): The URL to parse.
 
         Returns:
-            str: The body of the message.
+            Any: The body of the message.
         """
         try:
             response = await self._fetch_page(url, "item body")
@@ -248,7 +248,7 @@ class UNIT3D(BaseTracker):
 
             bodies = soup.find_all("div", class_="panel__body bbcode-rendered")
             if bodies:
-                return bodies[-1].get_text(separator="\n\n", strip=True)
+                return bodies[-1]
         except Exception as e:
             log.error(f"{self.domain}: Failed to fetch body from {url}: {e}")
             log.debug(f"{self.domain}: Network error details", exc_info=True)

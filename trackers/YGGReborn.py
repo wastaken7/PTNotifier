@@ -104,9 +104,7 @@ class YGGReborn(BaseTracker):
                 date_str = text.split("·")[-1].strip()
 
         body_div = soup.find("div", class_="whitespace-pre-wrap")
-        body_text = "No content"
-        if body_div:
-            body_text = body_div.get_text("\n\n", strip=True)
+        body_text = body_div if body_div else "No content"
 
         return {
             "type": "message",

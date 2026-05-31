@@ -1,0 +1,19 @@
+preset = "strict"
+python-version = "3.14"
+
+project-includes = [
+    "**/*.py*",
+    "**/*.ipynb",
+]
+
+project-excludes = [
+    "**/node_modules/**",
+    "**/.git/**",
+    "**/.github/**",
+    "**/.ruff_cache/**",
+    "**/.venv/**",
+    "**/__pycache__/**",
+    "**/cookies/**",
+    "**/state/**",
+    "**/debug/**",
+]

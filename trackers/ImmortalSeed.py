@@ -124,13 +124,10 @@ class ImmortalSeed(BaseTracker):
                     if buttons_div:
                         buttons_div.decompose()
 
-                    body_text = parent_td.get_text(separator="\n\n", strip=True)
                     strong_tag = parent_td.find("strong")
                     if strong_tag:
-                        subject_header = strong_tag.get_text(strip=True)
-                        body_text = body_text.replace(subject_header, "", 1).strip()
-
-                    return body_text
+                        strong_tag.decompose()
+                    return str(parent_td)
 
             return ""
         except Exception as e:

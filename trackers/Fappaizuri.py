@@ -91,7 +91,7 @@ class Fappaizuri(BaseTracker):
             if isinstance(body_row, Tag):
                 body_div = body_row.find("div", id="mpbox")
                 if isinstance(body_div, Tag):
-                    body = body_div.get_text(separator="\n", strip=True)
+                    body = body_div
 
             new_items.append(
                 {
