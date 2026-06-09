@@ -213,6 +213,10 @@ class BaseTracker(ABC):
         Sends an error notification to all configured notifiers.
         Respects the 24-hour rate limit (one per site per 24 hours).
         """
+        if not config.SETTINGS.get("SEND_ERROR_NOTIFICATIONS", False):
+            log.info(f"{self.tracker}: Error notification suppressed (disabled by config).")
+            return
+
         now = time.time()
         last_error_time = self.state.get("last_error_notification_time", 0.0)
 

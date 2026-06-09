@@ -19,6 +19,8 @@ SETTINGS: dict[str, Any] = {
     "CHECK_INTERVAL": 1800,
     # Only available for some trackers
     "MARK_AS_READ": False,
+    # Send error notifications (e.g. network error)
+    "SEND_ERROR_NOTIFICATIONS": False,
     # HTTP request timeout in seconds
     # Default is 30 seconds
     # Increase if you have a slow connection or the tracker is slow
