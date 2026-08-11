@@ -300,6 +300,12 @@ class BaseTracker(ABC):
                 log.warning(f"{self.tracker}: No message or notification available for test delivery.")
                 return False
 
+            # Tracker-specific test-item implementations may bypass the base
+            # fetch helpers and return a BeautifulSoup Tag as the message body.
+            # Normalize it before passing the item to notification backends,
+            # just as the regular processing path does.
+            self._post_process_item(item)
+
             log.info(f"{self.tracker}: Sending test item '{item.get('subject') or item.get('title') or item.get('id')}'...")
             await self._send_item_notifications(item, notifiers)
             log.info(f"{self.tracker}: Test notification sent.")
