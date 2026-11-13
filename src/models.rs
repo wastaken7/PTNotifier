@@ -72,6 +72,16 @@ pub struct TrackerState {
     pub username: Option<String>,
     #[serde(default)]
     pub initialized: bool,
+    /// Items whose delivery failed on one or more channels, keyed by item ID.
+    /// They stay unprocessed and are retried for the listed channels on the next check.
+    #[serde(default, skip_serializing_if = "std::collections::HashMap::is_empty")]
+    pub pending_deliveries: std::collections::HashMap<String, PendingDelivery>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct PendingDelivery {
+    pub channel_ids: Vec<String>,
+    pub attempts: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -117,7 +127,11 @@ pub struct UpdateTrackerRequest {
     pub kind: Option<String>,
     pub base_url: Option<String>,
     pub enabled: Option<bool>,
+    /// Missing field = keep current value; explicit `null` = clear the override.
+    #[serde(default, deserialize_with = "double_option")]
     pub check_interval_secs: Option<Option<u64>>,
+    /// Missing field = keep current value; explicit `null` = clear the override.
+    #[serde(default, deserialize_with = "double_option")]
     pub mark_as_read: Option<Option<bool>>,
     pub cookies_raw: Option<String>,
     pub api_token: Option<String>,
@@ -180,6 +194,17 @@ impl TrackerConfig {
 
 fn default_true() -> bool {
     true
+}
+
+/// Deserializes a present field (including `null`) as `Some(..)`; with `#[serde(default)]`
+/// an absent field stays `None`. Plain `Option<Option<T>>` maps `null` to `None`, which would
+/// make "clear this override" indistinguishable from "leave it unchanged".
+fn double_option<'de, T, D>(deserializer: D) -> Result<Option<Option<T>>, D::Error>
+where
+    T: Deserialize<'de>,
+    D: serde::Deserializer<'de>,
+{
+    Option::<T>::deserialize(deserializer).map(Some)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -518,4 +543,26 @@ pub struct AuthStatusResponse {
     pub setup_token_required: bool,
     pub user: Option<UserPublic>,
     pub csrf_token: Option<String>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn update_tracker_request_distinguishes_null_from_missing() {
+        let missing: UpdateTrackerRequest = serde_json::from_str("{}").unwrap();
+        assert_eq!(missing.check_interval_secs, None);
+        assert_eq!(missing.mark_as_read, None);
+
+        let cleared: UpdateTrackerRequest =
+            serde_json::from_str(r#"{"check_interval_secs":null,"mark_as_read":null}"#).unwrap();
+        assert_eq!(cleared.check_interval_secs, Some(None));
+        assert_eq!(cleared.mark_as_read, Some(None));
+
+        let set: UpdateTrackerRequest =
+            serde_json::from_str(r#"{"check_interval_secs":3600,"mark_as_read":false}"#).unwrap();
+        assert_eq!(set.check_interval_secs, Some(Some(3600)));
+        assert_eq!(set.mark_as_read, Some(Some(false)));
+    }
 }

@@ -1,15 +1,20 @@
 use crate::db::Database;
-use crate::models::{ItemType, NotificationItem, TrackerConfig, TrackerStatus, UiEvent};
+use crate::models::{
+    ItemType, NotificationItem, PendingDelivery, TrackerConfig, TrackerStatus, UiEvent,
+};
 use crate::notify;
 use crate::trackers::{self, TrackerContext, TrackerError, find_preset};
 use chrono::{DateTime, Duration as ChronoDuration, Utc};
 use regex::Regex;
 use reqwest::Client;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::{Mutex, broadcast, mpsc};
 use tracing::{error, info, warn};
+
+/// Failed deliveries are retried on subsequent checks up to this many attempts in total.
+const MAX_DELIVERY_ATTEMPTS: u32 = 5;
 
 #[derive(Debug)]
 pub enum SchedulerCmd {
@@ -144,39 +149,88 @@ pub async fn execute_tracker_check(
                 );
             } else {
                 let channels = db.list_channels().unwrap_or_default();
+                // Forget pending retries for items the tracker no longer reports (e.g. read elsewhere).
+                let current_ids: HashSet<&str> = items.iter().map(|i| i.id.as_str()).collect();
+                ctx.state
+                    .pending_deliveries
+                    .retain(|id, _| current_ids.contains(id.as_str()));
+
                 let mut sent = 0usize;
+                let mut pending = 0usize;
                 for item in &items {
                     if ctx.is_processed(&item.id) {
                         continue;
                     }
-                    ctx.mark_processed(&item.id);
 
-                    if should_ignore(item, &tracker.ignore_patterns) {
-                        info!(tracker = %tracker.name, id = %item.id, "Ignored item matching filter");
-                        continue;
+                    let retry = ctx.state.pending_deliveries.remove(&item.id);
+                    if retry.is_none() {
+                        if should_ignore(item, &tracker.ignore_patterns) {
+                            ctx.mark_processed(&item.id);
+                            info!(tracker = %tracker.name, id = %item.id, "Ignored item matching filter");
+                            continue;
+                        }
+                        if let Ok(entry) =
+                            db.insert_notification_history(&tracker.id, &tracker.name, item)
+                        {
+                            let _ = event_tx.send(UiEvent::NewNotification(entry));
+                        }
                     }
 
-                    if let Ok(entry) =
-                        db.insert_notification_history(&tracker.id, &tracker.name, item)
-                    {
-                        let _ = event_tx.send(UiEvent::NewNotification(entry));
-                    }
-
-                    notify::dispatch_item(
+                    let failed = notify::dispatch_item(
                         notify_client,
                         &channels,
                         &settings,
                         &tracker.name,
                         &tracker.base_url,
                         item,
+                        retry.as_ref().map(|r| r.channel_ids.as_slice()),
                     )
                     .await;
 
-                    trackers::mark_item_read(&ctx, item).await;
-                    sent += 1;
+                    if failed.is_empty() {
+                        ctx.mark_processed(&item.id);
+                        trackers::mark_item_read(&ctx, item).await;
+                        sent += 1;
+                        continue;
+                    }
+
+                    let attempts = retry.map_or(0, |r| r.attempts) + 1;
+                    if attempts >= MAX_DELIVERY_ATTEMPTS {
+                        // Give up so a permanently broken channel cannot pin the item forever.
+                        // The item is left unread on the tracker.
+                        warn!(
+                            tracker = %tracker.name,
+                            id = %item.id,
+                            attempts,
+                            "Delivery kept failing on {} channel(s); giving up",
+                            failed.len()
+                        );
+                        ctx.mark_processed(&item.id);
+                    } else {
+                        warn!(
+                            tracker = %tracker.name,
+                            id = %item.id,
+                            attempts,
+                            "Delivery failed on {} channel(s); will retry on the next check",
+                            failed.len()
+                        );
+                        ctx.state.pending_deliveries.insert(
+                            item.id.clone(),
+                            PendingDelivery {
+                                channel_ids: failed,
+                                attempts,
+                            },
+                        );
+                        pending += 1;
+                    }
                 }
-                if sent > 0 {
-                    info!(tracker = %tracker.name, count = sent, "Dispatched new notification(s)");
+                if sent > 0 || pending > 0 {
+                    info!(
+                        tracker = %tracker.name,
+                        count = sent,
+                        pending,
+                        "Dispatched new notification(s)"
+                    );
                 } else {
                     info!(tracker = %tracker.name, "No new notifications");
                 }
@@ -228,6 +282,7 @@ pub async fn execute_tracker_check(
                     &tracker.name,
                     &tracker.base_url,
                     &err_item,
+                    None,
                 )
                 .await;
             }
@@ -242,6 +297,7 @@ pub async fn execute_tracker_check(
             ) {
                 let _ = event_tx.send(UiEvent::TrackerUpdated(updated.to_public()));
             }
+            return Err(err.into());
         }
     }
 
@@ -298,7 +354,9 @@ pub fn spawn_scheduler(
                 if let Err(e) =
                     execute_tracker_check(&db, rate_limiter.clone(), &event_tx, &notify_client, &id)
                         .await
+                    && e.downcast_ref::<TrackerError>().is_none()
                 {
+                    // Tracker failures are already logged and recorded by execute_tracker_check.
                     warn!(tracker_id = %id, "Scheduled check error: {e}");
                 }
                 if let Ok(Some(t)) = db.get_tracker(&id)

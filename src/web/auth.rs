@@ -331,9 +331,10 @@ pub async fn setup_admin(
         Err(e) => return err_resp(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
     };
 
-    let user = match state.db.create_user(&username, &pw_hash, UserRole::Admin) {
-        Ok(u) => u,
-        Err(e) => return err_resp(StatusCode::CONFLICT, e.to_string()),
+    let user = match state.db.create_initial_admin(&username, &pw_hash) {
+        Ok(Some(u)) => u,
+        Ok(None) => return err_resp(StatusCode::CONFLICT, "Initial setup is already complete"),
+        Err(e) => return err_resp(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
     };
     *state.setup_token_hash.lock().unwrap() = None;
     info!(username = %user.username, ip = %client_ip, "Initial administrator account created");
@@ -469,7 +470,8 @@ pub async fn change_password(
     Json(payload): Json<ChangePasswordRequest>,
 ) -> Response {
     if !verify_password(&payload.current_password, &auth.user.password_hash) {
-        return err_resp(StatusCode::UNAUTHORIZED, "Current password is incorrect");
+        // Not 401: the session is still valid, and the WebUI treats 401 as "signed out".
+        return err_resp(StatusCode::BAD_REQUEST, "Current password is incorrect");
     }
     if let Err(e) = validate_password(&payload.new_password) {
         return err_resp(StatusCode::BAD_REQUEST, e.to_string());

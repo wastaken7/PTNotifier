@@ -2,6 +2,7 @@
 name = "ptnotifier"
 version = "0.1.0"
 edition = "2024"
+rust-version = "1.89"
 description = "Private Tracker Notification & PM Monitor with WebUI"
 
 [[bin]]
@@ -10,7 +11,8 @@ path = "src/main.rs"
 
 [features]
 default = []
-tray = ["dep:tray-icon", "dep:winit"]
+# Linux/BSD tray: driven by a GTK main loop (Windows/macOS always build the winit tray).
+tray = ["dep:tray-icon", "dep:gtk"]
 
 [dependencies]
 anyhow = "1"
@@ -24,6 +26,7 @@ image = { version = "0.25", default-features = false, features = ["ico", "png", 
 regex = "1"
 reqwest = { version = "0.12", default-features = false, features = ["json", "cookies", "http2", "multipart", "rustls-tls", "gzip", "deflate"] }
 ring = "0.17"
+rpassword = "7"
 rusqlite = { version = "0.32", features = ["bundled"] }
 scraper = "0.22"
 serde = { version = "1", features = ["derive"] }
@@ -35,11 +38,13 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 tray-icon = { version = "0.19", optional = true }
 url = "2"
 uuid = { version = "1", features = ["v4"] }
-winit = { version = "0.30", optional = true }
 
 [target.'cfg(any(target_os = "windows", target_os = "macos"))'.dependencies]
 tray-icon = "0.19"
 winit = "0.30"
+
+[target.'cfg(not(any(target_os = "windows", target_os = "macos")))'.dependencies]
+gtk = { version = "0.18", optional = true }
 
 [target.'cfg(windows)'.build-dependencies]
 winresource = "0.1"

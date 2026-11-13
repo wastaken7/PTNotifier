@@ -11,8 +11,13 @@ pub async fn fetch_items(ctx: &mut TrackerContext) -> Result<Vec<NotificationIte
     let candidates = parse_nexusphp_inbox(&html, ctx);
     let mut items = Vec::with_capacity(candidates.len());
 
+    // Opening `viewmessage` marks the PM as read on NexusPHP, so only fetch bodies when the
+    // user asked for messages to be marked as read.
+    let fetch_bodies = ctx.should_mark_as_read();
     for mut item in candidates {
-        if let Ok(body_html) = ctx.fetch_page(&item.url, "message body", None).await {
+        if fetch_bodies
+            && let Ok(body_html) = ctx.fetch_page(&item.url, "message body", None).await
+        {
             item.body = extract_nexusphp_body(&body_html);
         }
         items.push(item);
@@ -27,7 +32,11 @@ fn parse_nexusphp_inbox(html: &str, ctx: &TrackerContext) -> Vec<NotificationIte
 
     let target_table = doc
         .select(&sel(r#"table[width="737"][cellpadding="4"]"#))
-        .find(|t| t.select(&sel("td")).any(|td| text_clean(td).contains("Subject")));
+        .find(|t| {
+            // Locale-independent: the inbox table is the one linking to individual messages.
+            t.select(&sel("a[href]"))
+                .any(|a| a.value().attr("href").is_some_and(|h| h.contains("action=viewmessage")))
+        });
 
     let Some(table) = target_table else {
         return items;

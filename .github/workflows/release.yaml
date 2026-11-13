@@ -16,8 +16,36 @@ env:
   BIN_NAME: ptn
 
 jobs:
+  resolve:
+    name: Resolve release source
+    runs-on: ubuntu-latest
+    outputs:
+      sha: ${{ steps.resolve.outputs.sha }}
+
+    steps:
+      - name: Resolve tag to commit
+        id: resolve
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$TAG" =~ ^[0-9A-Za-z][0-9A-Za-z._-]*$ ]]; then
+            echo "::error::Invalid release tag '$TAG'"
+            exit 1
+          fi
+          if sha=$(gh api "repos/${GITHUB_REPOSITORY}/commits/refs/tags/${TAG}" --jq .sha 2>/dev/null); then
+            echo "Tag ${TAG} already exists at ${sha}; building that commit."
+          else
+            sha="${GITHUB_SHA}"
+            echo "Tag ${TAG} does not exist yet; it will be created at ${sha}."
+          fi
+          echo "sha=${sha}" >> "$GITHUB_OUTPUT"
+
   build:
     name: Build (${{ matrix.name }})
+    needs: resolve
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -73,13 +101,18 @@ jobs:
             apt: ''
 
     steps:
-      - name: Checkout repository
+      - name: Checkout release source
         uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve.outputs.sha }}
+          persist-credentials: false
 
       - name: Resolve release version
         id: meta
         shell: bash
-        run: echo "version=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+        env:
+          TAG: ${{ inputs.tag }}
+        run: echo "version=${TAG}" >> "$GITHUB_OUTPUT"
 
       - name: Install system dependencies
         if: matrix.apt != ''
@@ -129,7 +162,7 @@ jobs:
 
   release:
     name: Publish GitHub Release
-    needs: build
+    needs: [resolve, build]
     runs-on: ubuntu-latest
 
     steps:
@@ -148,5 +181,6 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ inputs.tag }}
+          target_commitish: ${{ needs.resolve.outputs.sha }}
           generate_release_notes: true
           files: dist/*

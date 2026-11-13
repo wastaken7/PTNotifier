@@ -672,17 +672,45 @@ async fn list_logs(State(state): State<AppState>) -> Response {
     Json(state.log_broadcaster.recent()).into_response()
 }
 
+/// How often an open event stream re-validates its session when no events are flowing.
+const SSE_SESSION_RECHECK: Duration = Duration::from_secs(15);
+
 async fn sse_events(
     State(state): State<AppState>,
+    Extension(auth): Extension<AuthContext>,
 ) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
     let rx = state.event_tx.subscribe();
-    let stream = BroadcastStream::new(rx).filter_map(|res| match res {
-        Ok(ev) => {
+    let token_hash = auth.session.token_hash;
+
+    // Authentication only ran when the stream opened, so re-check the session before each
+    // event and periodically; end the stream once it expires or is revoked (sign-out
+    // elsewhere, password change, user deletion).
+    let db = state.db.clone();
+    let hash = token_hash.clone();
+    let session_active = move || db.is_session_active(&hash).unwrap_or(false);
+
+    let db = state.db.clone();
+    let revoked = async move {
+        let mut tick = tokio::time::interval(SSE_SESSION_RECHECK);
+        tick.tick().await;
+        loop {
+            tick.tick().await;
+            if !db.is_session_active(&token_hash).unwrap_or(false) {
+                break;
+            }
+        }
+    };
+
+    let stream = BroadcastStream::new(rx)
+        .filter_map(Result::ok)
+        .map_while(move |ev| {
+            if !session_active() {
+                return None;
+            }
             let data = serde_json::to_string(&ev).unwrap_or_default();
             Some(Ok(Event::default().data(data)))
-        }
-        Err(_) => None,
-    });
+        });
+    let stream = futures::StreamExt::take_until(stream, Box::pin(revoked));
     Sse::new(stream).keep_alive(KeepAlive::new().interval(Duration::from_secs(15)))
 }
 
@@ -713,6 +741,61 @@ mod tests {
             allow_private_networks: false,
         };
         router(state)
+    }
+
+    #[tokio::test]
+    async fn concurrent_setup_creates_one_admin_and_wrong_current_password_is_not_401() {
+        let app = test_app(None);
+        let setup = |name: &'static str| {
+            let app = app.clone();
+            async move {
+                app.oneshot(
+                    Request::post("/api/auth/setup")
+                        .header("content-type", "application/json")
+                        .body(Body::from(format!(
+                            r#"{{"username":"{name}","password":"very-strong-password-1"}}"#
+                        )))
+                        .unwrap(),
+                )
+                .await
+                .unwrap()
+            }
+        };
+        let (a, b) = tokio::join!(setup("alice"), setup("bob"));
+        let mut statuses = [a.status(), b.status()];
+        statuses.sort();
+        assert_eq!(statuses, [StatusCode::CREATED, StatusCode::CONFLICT]);
+
+        let created = if a.status() == StatusCode::CREATED { a } else { b };
+        let cookie_pair = created
+            .headers()
+            .get(header::SET_COOKIE)
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .split(';')
+            .next()
+            .unwrap()
+            .to_string();
+        let body = axum::body::to_bytes(created.into_body(), 1024 * 64).await.unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        let csrf = json["csrf_token"].as_str().unwrap().to_string();
+
+        let resp = app
+            .clone()
+            .oneshot(
+                Request::post("/api/auth/password")
+                    .header("cookie", &cookie_pair)
+                    .header("x-csrf-token", &csrf)
+                    .header("content-type", "application/json")
+                    .body(Body::from(
+                        r#"{"current_password":"not-the-password","new_password":"another-strong-pass-2"}"#,
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
     }
 
     #[tokio::test]

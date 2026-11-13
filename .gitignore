@@ -7,6 +7,7 @@
 .env
 .env.*
 !.env.example
+.ptn_master.key
 
 # Database & Runtime State
 *.db

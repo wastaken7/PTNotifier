@@ -179,7 +179,16 @@ fn read_password_arg(provided: Option<String>) -> Result<String> {
     if let Some(p) = provided {
         return Ok(p);
     }
-    eprint!("Enter password (min 10 chars): ");
+    const PROMPT: &str = "Enter password (min 10 chars): ";
+    use std::io::IsTerminal;
+    if std::io::stdin().is_terminal() {
+        // Reads from the controlling terminal with echo disabled; the previous
+        // terminal mode is restored on both success and failure.
+        let pw = rpassword::prompt_password(PROMPT)?;
+        return Ok(pw.trim_end_matches(&['\r', '\n'][..]).to_string());
+    }
+    // Non-interactive input (e.g. piped from a secret manager): nothing to hide.
+    eprint!("{PROMPT}");
     let mut line = String::new();
     std::io::stdin().read_line(&mut line)?;
     Ok(line.trim_end_matches(&['\r', '\n'][..]).to_string())
@@ -356,12 +365,17 @@ fn main() -> Result<()> {
             })?;
 
             info!(address = %bind, db = %db_path.display(), "PTNotifier WebUI listening (tray mode)");
+            // tray -> server: Quit selected in the tray menu.
             let (shutdown_tx, shutdown_rx) = tokio::sync::oneshot::channel::<()>();
+            // server -> tray: Ctrl+C received, so the tray loop must exit as well.
+            let (exit_tx, exit_rx) = tokio::sync::oneshot::channel::<()>();
 
             let server_handle = rt.spawn(async move {
                 let shutdown = async {
                     tokio::select! {
-                        _ = shutdown_signal() => {}
+                        _ = shutdown_signal() => {
+                            let _ = exit_tx.send(());
+                        }
                         _ = shutdown_rx => {}
                     }
                 };
@@ -383,6 +397,7 @@ fn main() -> Result<()> {
                 scheduler,
                 rt.handle().clone(),
                 shutdown_tx,
+                exit_rx,
             );
 
             rt.block_on(async {
@@ -462,7 +477,8 @@ fn main() -> Result<()> {
                     std::process::exit(1);
                 }
 
-                for t in targets {
+                let mut failed = 0usize;
+                for t in &targets {
                     if let Err(e) = scheduler::execute_tracker_check(
                         &db,
                         rate_limiter.clone(),
@@ -473,7 +489,11 @@ fn main() -> Result<()> {
                     .await
                     {
                         error!(tracker = %t.name, "Check failed: {e}");
+                        failed += 1;
                     }
+                }
+                if failed > 0 {
+                    bail!("{failed} of {} tracker check(s) failed", targets.len());
                 }
                 Ok::<_, anyhow::Error>(())
             })?;

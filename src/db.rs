@@ -730,6 +730,29 @@ impl Database {
             .ok_or_else(|| anyhow!("failed to read back created user"))
     }
 
+    /// Creates the first administrator only if no user exists yet. The emptiness check and the
+    /// insert run in one immediate transaction under the connection lock, so concurrent setup
+    /// requests cannot both succeed. Returns `None` when setup was already completed.
+    pub fn create_initial_admin(&self, username: &str, password_hash: &str) -> Result<Option<UserRecord>> {
+        let id = Uuid::new_v4().to_string();
+        let now = Utc::now().to_rfc3339();
+        {
+            let mut conn = self.conn.lock().unwrap();
+            let tx = conn.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
+            let count: i64 = tx.query_row("SELECT COUNT(*) FROM users", [], |r| r.get(0))?;
+            if count > 0 {
+                return Ok(None);
+            }
+            tx.execute(
+                "INSERT INTO users (id, username, password_hash, role, token_version, created_at, updated_at)
+                 VALUES (?1, ?2, ?3, ?4, 1, ?5, ?6)",
+                params![id, username, password_hash, UserRole::Admin.as_str(), now, now],
+            )?;
+            tx.commit()?;
+        }
+        self.get_user_by_id(&id)
+    }
+
     pub fn get_user_by_id(&self, id: &str) -> Result<Option<UserRecord>> {
         let conn = self.conn.lock().unwrap();
         conn.query_row(
@@ -928,6 +951,23 @@ impl Database {
         );
         sess.last_seen_at = now;
         Ok(Some((sess, user)))
+    }
+
+    /// Read-only validity check (does not refresh `last_seen_at`), for long-lived connections
+    /// that must stop once their session expires or is revoked.
+    pub fn is_session_active(&self, token_hash: &str) -> Result<bool> {
+        let now = Utc::now().to_rfc3339();
+        let conn = self.conn.lock().unwrap();
+        let active = conn
+            .query_row(
+                "SELECT 1 FROM sessions s JOIN users u ON u.id = s.user_id
+                 WHERE s.token_hash = ?1 AND s.expires_at > ?2 AND s.token_version = u.token_version",
+                params![token_hash, now],
+                |_| Ok(()),
+            )
+            .optional()?
+            .is_some();
+        Ok(active)
     }
 
     pub fn list_user_sessions(
@@ -1202,5 +1242,24 @@ mod tests {
         assert!(db.verify_rss_token("rsshash1").unwrap());
         assert!(db.delete_rss_token(&user.id, &rss.id).unwrap());
         assert!(!db.verify_rss_token("rsshash1").unwrap());
+    }
+
+    #[test]
+    fn initial_admin_is_created_only_once_and_session_activity_tracks_revocation() {
+        let db = Database::open_in_memory().unwrap();
+        let first = db.create_initial_admin("admin", "$argon2id$a").unwrap();
+        let user = first.expect("first setup creates the admin");
+        assert_eq!(user.role, UserRole::Admin);
+        assert!(db.create_initial_admin("other", "$argon2id$b").unwrap().is_none());
+        assert_eq!(db.count_users().unwrap(), 1);
+
+        let exp = (Utc::now() + chrono::Duration::hours(1)).to_rfc3339();
+        db.create_session("live", &user.id, 1, "csrf", "UA", "1.2.3.4", &exp)
+            .unwrap();
+        assert!(db.is_session_active("live").unwrap());
+        assert!(!db.is_session_active("missing").unwrap());
+
+        db.update_user_password(&user.id, "$argon2id$new", None).unwrap();
+        assert!(!db.is_session_active("live").unwrap());
     }
 }

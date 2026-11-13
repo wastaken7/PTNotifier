@@ -54,18 +54,26 @@ Built-in presets cover major tracker engines as well as individual sites:
 
 Multi-arch images (`linux/amd64` and `linux/arm64`) are published to GitHub Container Registry:
 
+Generate the master key **once** and keep it in an env file (or your secret store). Every container created against the same `/data` volume must reuse that key: a new key cannot decrypt the tracker cookies and channel secrets already stored in the database.
+
 ```bash
+# One-time: create a private env file holding the master key
+umask 077
+printf 'PTN_MASTER_KEY=%s\n' "$(openssl rand -hex 32)" > ptnotifier.env
+
 docker run -d \
   --name ptnotifier \
   -p 127.0.0.1:8085:8085 \
   -v $(pwd)/data:/data \
+  --env-file ptnotifier.env \
   -e PTN_ADMIN_USER=admin \
   -e PTN_ADMIN_PASSWORD="change-this-strong-password" \
-  -e PTN_MASTER_KEY="$(openssl rand -hex 32)" \
   -e PTN_TRUST_PROXY=true \
   --restart unless-stopped \
   ghcr.io/wastaken7/ptnotifier:latest
 ```
+
+Back up `ptnotifier.env` together with the `data/` directory: a database backup is useless without the key it was encrypted with. If `PTN_MASTER_KEY` is not set, a key file is generated next to the database (`data/.ptn_master.key`) and must be backed up the same way.
 
 Or build locally from the `Dockerfile`:
 
@@ -82,7 +90,7 @@ If `PTN_ADMIN_PASSWORD` is not set on first run, a one-time setup token is print
 
 ### Building from Source
 
-Requires Rust (2024 edition; the `Dockerfile` uses `rust:1.85-bookworm`):
+Requires Rust 1.89 or newer (2024 edition; the `Dockerfile` uses `rust:1.89-bookworm`):
 
 ```bash
 cargo build --release

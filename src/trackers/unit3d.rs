@@ -1,14 +1,12 @@
 use crate::models::{ItemType, NotificationItem};
 use crate::trackers::{TrackerContext, TrackerError, sel, text_clean};
 use scraper::Html;
-use std::collections::hash_map::DefaultHasher;
-use std::hash::{Hash, Hasher};
 use tracing::warn;
 
-fn short_hash(s: &str) -> u64 {
-    let mut h = DefaultHasher::new();
-    s.hash(&mut h);
-    h.finish()
+/// Stable short digest for IDs that are persisted across runs and toolchain upgrades
+/// (`DefaultHasher` output is not guaranteed to be stable between Rust releases).
+fn short_hash(s: &str) -> String {
+    crate::security::sha256_hex(s)[..16].to_string()
 }
 
 async fn ensure_initialized(ctx: &mut TrackerContext, hawke_uno: bool) -> Result<(), TrackerError> {
@@ -54,9 +52,14 @@ async fn ensure_initialized(ctx: &mut TrackerContext, hawke_uno: bool) -> Result
         }
     }
 
-    if ctx.state.messages_url.is_none()
-        && let Some(nurl) = &ctx.state.notifications_url
-    {
+    // A login page has neither link: report it instead of silently checking nothing.
+    let Some(nurl) = ctx.state.notifications_url.clone() else {
+        ctx.state.messages_url = None;
+        return Err(TrackerError::CookieExpired(
+            "initialize: notifications link not found (expired cookies or HTML changed)".into(),
+        ));
+    };
+    if ctx.state.messages_url.is_none() {
         ctx.state.messages_url = Some(nurl.replace("notifications", "conversations"));
     }
 
@@ -260,7 +263,10 @@ fn parse_hawke_messages(html: &str, ctx: &TrackerContext) -> Vec<NotificationIte
             .unwrap_or_else(|| "New Message".into());
         let wire_key = row.value().attr("wire:key").unwrap_or_default();
         let corr_id = wire_key.rsplit('-').next().unwrap_or("");
-        let item_id = format!("msg_{corr_id}");
+        // Rows are per correspondent, so `corr_id` alone would suppress every later message
+        // from the same person. The latest message's preview identifies the message itself.
+        let item_id = format!("msg_{corr_id}_{}", short_hash(&format!("{sender}
+{subject}")));
         if ctx.is_processed(&item_id) {
             continue;
         }

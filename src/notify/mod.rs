@@ -10,6 +10,9 @@ use reqwest::Client;
 use std::sync::OnceLock;
 use tracing::error;
 
+/// Sends `item` to every enabled channel subscribed to its type and returns the IDs of the
+/// channels whose delivery failed. When `only` is given, delivery is restricted to those
+/// channel IDs (used to retry previously failed deliveries).
 pub async fn dispatch_item(
     client: &Client,
     channels: &[ChannelConfig],
@@ -17,9 +20,14 @@ pub async fn dispatch_item(
     tracker_name: &str,
     base_url: &str,
     item: &NotificationItem,
-) {
+    only: Option<&[String]>,
+) -> Vec<String> {
+    let mut failed = Vec::new();
     for ch in channels {
         if !ch.enabled {
+            continue;
+        }
+        if only.is_some_and(|ids| !ids.contains(&ch.id)) {
             continue;
         }
         let should_send = match item.item_type {
@@ -33,11 +41,36 @@ pub async fn dispatch_item(
 
         if let Err(e) = send_to_channel(client, ch, settings, tracker_name, base_url, item).await {
             error!(channel = %ch.name, kind = %ch.kind.as_str(), "Failed to send notification: {e}");
+            failed.push(ch.id.clone());
         }
     }
+    failed
 }
 
 pub async fn send_to_channel(
+    client: &Client,
+    channel: &ChannelConfig,
+    settings: &GlobalSettings,
+    tracker_name: &str,
+    base_url: &str,
+    item: &NotificationItem,
+) -> Result<()> {
+    send_to_channel_inner(client, channel, settings, tracker_name, base_url, item)
+        .await
+        .map_err(redact_transport_error)
+}
+
+/// Channel URLs embed credentials (Gotify `?token=`, Telegram `/bot<token>/`, Discord webhook
+/// secrets), and `reqwest::Error`'s message includes the request URL. Strip it before the error
+/// reaches the logs, which are retained and broadcast to the WebUI.
+fn redact_transport_error(err: anyhow::Error) -> anyhow::Error {
+    match err.downcast::<reqwest::Error>() {
+        Ok(re) => anyhow::Error::new(re.without_url()),
+        Err(other) => other,
+    }
+}
+
+async fn send_to_channel_inner(
     client: &Client,
     channel: &ChannelConfig,
     settings: &GlobalSettings,
@@ -182,7 +215,226 @@ pub fn format_telegram_html(raw: &str) -> String {
         .get_or_init(|| Regex::new(r"(?is)<strike>(.*?)</strike>").unwrap())
         .replace_all(&s, "<s>$1</s>");
 
-    s.trim().to_string()
+    sanitize_telegram_html(s.trim())
+}
+
+/// Escapes plain text for Telegram's HTML parse mode.
+pub fn escape_telegram_html(raw: &str) -> String {
+    let mut out = String::with_capacity(raw.len());
+    for c in raw.chars() {
+        match c {
+            '&' => out.push_str("&amp;"),
+            '<' => out.push_str("&lt;"),
+            '>' => out.push_str("&gt;"),
+            '"' => out.push_str("&quot;"),
+            _ => out.push(c),
+        }
+    }
+    out
+}
+
+/// Maps an HTML tag name to the Telegram-supported tag it should be rendered as.
+fn telegram_tag(name: &str) -> Option<&'static str> {
+    Some(match name {
+        "b" | "strong" => "b",
+        "i" | "em" => "i",
+        "u" | "ins" => "u",
+        "s" | "strike" | "del" => "s",
+        "code" => "code",
+        "pre" => "pre",
+        "a" => "a",
+        "tg-spoiler" => "tg-spoiler",
+        "blockquote" => "blockquote",
+        _ => return None,
+    })
+}
+
+/// Appends `text` to `out`, escaping markup characters. Entities Telegram understands are kept;
+/// a few common named entities are decoded; any other `&` is escaped.
+fn push_telegram_text(out: &mut String, text: &str) {
+    static RE_ENTITY: OnceLock<Regex> = OnceLock::new();
+    let re_entity = RE_ENTITY
+        .get_or_init(|| Regex::new(r"^&(?:#[0-9]{1,7}|#[xX][0-9a-fA-F]{1,6}|[a-zA-Z]{2,8});").unwrap());
+
+    let mut i = 0;
+    while let Some(c) = text[i..].chars().next() {
+        match c {
+            '<' => out.push_str("&lt;"),
+            '>' => out.push_str("&gt;"),
+            '&' => {
+                if let Some(m) = re_entity.find(&text[i..]) {
+                    let ent = m.as_str();
+                    let replacement = match ent {
+                        "&lt;" | "&gt;" | "&amp;" | "&quot;" => Some(ent),
+                        "&nbsp;" => Some(" "),
+                        "&apos;" => Some("'"),
+                        _ if ent.starts_with("&#") => Some(ent),
+                        _ => None,
+                    };
+                    if let Some(r) = replacement {
+                        out.push_str(r);
+                        i += ent.len();
+                        continue;
+                    }
+                }
+                out.push_str("&amp;");
+            }
+            _ => out.push(c),
+        }
+        i += c.len_utf8();
+    }
+}
+
+fn decode_basic_entities(s: &str) -> String {
+    s.replace("&quot;", "\"")
+        .replace("&#39;", "'")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&amp;", "&")
+}
+
+/// Reduces arbitrary HTML to the subset Telegram accepts: supported tags are normalized and
+/// kept balanced, unsupported tags are dropped, and text is escaped.
+pub fn sanitize_telegram_html(input: &str) -> String {
+    static RE_TAG: OnceLock<Regex> = OnceLock::new();
+    static RE_HREF: OnceLock<Regex> = OnceLock::new();
+    let re_tag = RE_TAG.get_or_init(|| Regex::new(r"(?s)<(/?)([a-zA-Z][a-zA-Z0-9-]*)([^<>]*)>").unwrap());
+    let re_href = RE_HREF.get_or_init(|| {
+        Regex::new(r#"(?is)\bhref\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+))"#).unwrap()
+    });
+
+    let mut out = String::with_capacity(input.len());
+    let mut stack: Vec<&'static str> = Vec::new();
+    let mut last = 0;
+
+    for caps in re_tag.captures_iter(input) {
+        let whole = caps.get(0).unwrap();
+        push_telegram_text(&mut out, &input[last..whole.start()]);
+        last = whole.end();
+
+        let closing = !caps[1].is_empty();
+        let Some(tag) = telegram_tag(&caps[2].to_ascii_lowercase()) else {
+            continue;
+        };
+
+        if closing {
+            if let Some(pos) = stack.iter().rposition(|t| *t == tag) {
+                while stack.len() > pos {
+                    let t = stack.pop().unwrap();
+                    out.push_str("</");
+                    out.push_str(t);
+                    out.push('>');
+                }
+            }
+            continue;
+        }
+
+        // Telegram does not allow formatting inside code blocks (except <code> in <pre>),
+        // nor nested links.
+        let in_code = stack.iter().any(|t| *t == "code" || *t == "pre");
+        if in_code && !(tag == "code" && stack.last() == Some(&"pre")) {
+            continue;
+        }
+        if tag == "a" {
+            if stack.contains(&"a") {
+                continue;
+            }
+            let href = re_href.captures(&caps[3]).and_then(|h| {
+                h.get(1).or(h.get(2)).or(h.get(3)).map(|m| decode_basic_entities(m.as_str().trim()))
+            });
+            let Some(href) = href.filter(|h| {
+                let lower = h.to_ascii_lowercase();
+                lower.starts_with("http://") || lower.starts_with("https://")
+            }) else {
+                continue;
+            };
+            out.push_str("<a href=\"");
+            out.push_str(&escape_telegram_html(&href));
+            out.push_str("\">");
+        } else {
+            out.push('<');
+            out.push_str(tag);
+            out.push('>');
+        }
+        stack.push(tag);
+    }
+    push_telegram_text(&mut out, &input[last..]);
+    while let Some(t) = stack.pop() {
+        out.push_str("</");
+        out.push_str(t);
+        out.push('>');
+    }
+    out
+}
+
+/// Splits sanitized Telegram HTML into chunks of at most `limit` visible characters (counted in
+/// UTF-16 code units after entity parsing, as Telegram does). Formatting tags that are open at a
+/// split point are closed at the end of the chunk and reopened at the start of the next one.
+pub fn split_telegram_html(html: &str, limit: usize) -> Vec<String> {
+    let limit = limit.max(1);
+    let soft_limit = limit.saturating_sub(512);
+    let mut chunks = Vec::new();
+    let mut cur = String::new();
+    let mut cur_len = 0usize;
+    let mut open: Vec<(String, String)> = Vec::new();
+
+    let flush = |cur: &mut String, cur_len: &mut usize, open: &[(String, String)], chunks: &mut Vec<String>| {
+        for (_, name) in open.iter().rev() {
+            cur.push_str("</");
+            cur.push_str(name);
+            cur.push('>');
+        }
+        chunks.push(std::mem::take(cur));
+        *cur_len = 0;
+        for (tag, _) in open {
+            cur.push_str(tag);
+        }
+    };
+
+    let mut i = 0;
+    while i < html.len() {
+        let rest = &html[i..];
+        if rest.starts_with('<') {
+            let end = rest.find('>').map_or(rest.len(), |e| e + 1);
+            let tag = &rest[..end];
+            if tag.starts_with("</") {
+                open.pop();
+            } else {
+                let name: String = tag[1..]
+                    .chars()
+                    .take_while(|c| c.is_ascii_alphanumeric() || *c == '-')
+                    .collect();
+                open.push((tag.to_string(), name));
+            }
+            cur.push_str(tag);
+            i += end;
+            continue;
+        }
+
+        let (unit, width) = match rest.find(';') {
+            Some(semi) if rest.starts_with('&') && semi <= 10 => (&rest[..=semi], 1),
+            _ => {
+                let c = rest.chars().next().unwrap();
+                (&rest[..c.len_utf8()], c.len_utf16())
+            }
+        };
+
+        if cur_len > 0 && cur_len + width > limit {
+            flush(&mut cur, &mut cur_len, &open, &mut chunks);
+        }
+        cur.push_str(unit);
+        cur_len += width;
+        i += unit.len();
+
+        // Prefer splitting on a line break once the chunk is nearly full.
+        if unit == "\n" && cur_len >= soft_limit && soft_limit > 0 {
+            flush(&mut cur, &mut cur_len, &open, &mut chunks);
+        }
+    }
+    if cur_len > 0 {
+        chunks.push(cur);
+    }
+    chunks
 }
 
 pub fn item_icon(item_type: ItemType) -> &'static str {
@@ -209,5 +461,54 @@ mod tests {
         let input = "[b]Alert[/b] [spoiler]secret[/spoiler]";
         let html = format_telegram_html(input);
         assert_eq!(html, "<b>Alert</b> <tg-spoiler>secret</tg-spoiler>");
+    }
+
+    #[test]
+    fn telegram_html_escapes_text_and_keeps_only_supported_balanced_tags() {
+        assert_eq!(escape_telegram_html("Use <name> & co"), "Use &lt;name&gt; &amp; co");
+
+        let html = sanitize_telegram_html(
+            r#"<div class="x">a < b &amp; c &nbsp;&copy; <strong>bold <em>it</strong> <a href="javascript:alert(1)">bad</a> <a href='https://e.org/?a=1&amp;b=2'>ok</a> <b>open"#,
+        );
+        assert_eq!(
+            html,
+            r#"a &lt; b &amp; c  &amp;copy; <b>bold <i>it</i></b> bad <a href="https://e.org/?a=1&amp;b=2">ok</a> <b>open</b>"#
+        );
+
+        // No formatting inside code blocks.
+        assert_eq!(
+            sanitize_telegram_html("<code><b>x</b></code>"),
+            "<code>x</code>"
+        );
+    }
+
+    #[test]
+    fn telegram_split_respects_limit_and_reopens_tags() {
+        let text = format!("<b>{}</b>", "a".repeat(10));
+        let chunks = split_telegram_html(&text, 4);
+        assert_eq!(chunks, vec!["<b>aaaa</b>", "<b>aaaa</b>", "<b>aa</b>"]);
+
+        // Entities count as one character.
+        let chunks = split_telegram_html("&amp;&amp;&amp;", 2);
+        assert_eq!(chunks, vec!["&amp;&amp;", "&amp;"]);
+
+        let long = "x".repeat(5000);
+        let chunks = split_telegram_html(&long, 4096);
+        assert_eq!(chunks.len(), 2);
+        assert_eq!(chunks[0].chars().count(), 4096);
+    }
+
+    #[test]
+    fn transport_errors_lose_their_credential_bearing_url() {
+        let rt = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
+        let err = rt.block_on(async {
+            Client::new()
+                .get("http://127.0.0.1:1/message?token=SECRET_TOKEN")
+                .send()
+                .await
+                .unwrap_err()
+        });
+        let redacted = redact_transport_error(anyhow::Error::new(err));
+        assert!(!format!("{redacted:#}").contains("SECRET_TOKEN"));
     }
 }

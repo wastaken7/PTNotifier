@@ -99,10 +99,36 @@ function disconnectSSE() {
   }
 }
 
+const ACCOUNT_FORMS = ["tracker-form", "channel-form", "password-form", "rss-token-form", "create-user-form", "settings-form"];
+
+// Drops everything that belongs to the signed-in account so the next user of this tab
+// cannot see it (revealed RSS URL, typed secrets, cached lists, open dialogs).
+function clearAccountState() {
+  ["tracker-modal", "channel-modal"].forEach((id) => closeModal(id));
+  ACCOUNT_FORMS.forEach((id) => {
+    const form = document.getElementById(id);
+    if (form) form.reset();
+  });
+  const reveal = document.getElementById("rss-token-reveal");
+  if (reveal) reveal.style.display = "none";
+  const revealUrl = document.getElementById("rss-token-url");
+  if (revealUrl) revealUrl.textContent = "";
+
+  state.trackers = [];
+  state.channels = [];
+  state.notifications = [];
+  state.settings = null;
+  state.logs = [];
+  state.rssTokens = [];
+  state.sessions = [];
+  state.users = [];
+}
+
 function handleSessionExpired() {
   disconnectSSE();
   state.user = null;
   state.csrfToken = null;
+  clearAccountState();
   document.getElementById("app-shell").style.display = "none";
   showLoginView();
 }
@@ -842,7 +868,14 @@ document.getElementById("login-form").addEventListener("submit", async (e) => {
 document.getElementById("btn-logout").addEventListener("click", async () => {
   try {
     await api("/api/auth/logout", { method: "POST" });
-  } catch {}
+  } catch (err) {
+    // A 401 already signed this tab out (inside api()). Anything else means the server may
+    // still hold the session, so do not pretend the browser is signed out.
+    if (state.user) {
+      showToast(`Sign out failed: ${err.message}. Click "Sign out" to try again.`);
+      return;
+    }
+  }
   handleSessionExpired();
 });
 
@@ -1031,14 +1064,33 @@ function connectSSE() {
   const label = ind.querySelector(".sse-label");
   const es = new EventSource("/api/events");
   state.eventSource = es;
+  let openedBefore = false;
 
-  es.onopen = () => {
+  es.onopen = async () => {
     ind.dataset.state = "connected";
     label.textContent = "Live";
+    if (!openedBefore) {
+      openedBefore = true;
+      return;
+    }
+    // Events emitted while disconnected are not replayed: reload the snapshot.
+    try {
+      await loadAll();
+    } catch {}
   };
-  es.onerror = () => {
+  es.onerror = async () => {
     ind.dataset.state = "reconnecting";
     label.textContent = "Reconnecting";
+    if (es.readyState !== EventSource.CLOSED || state.eventSource !== es) return;
+    // The browser gave up (e.g. the server ended the stream because the session was revoked
+    // and the reconnect got 401). Find out whether we are still signed in.
+    try {
+      const status = await api("/api/auth/status");
+      if (!status.authenticated) handleSessionExpired();
+      else if (state.eventSource === es) setTimeout(() => state.user && connectSSE(), 5000);
+    } catch {
+      if (state.eventSource === es) setTimeout(() => state.user && connectSSE(), 5000);
+    }
   };
   es.onmessage = (msg) => {
     try {
@@ -1053,7 +1105,10 @@ function connectSSE() {
         else state.trackers.push(ev.data);
         renderTrackers();
       } else if (ev.event === "new_notification") {
-        state.notifications.unshift(ev.data);
+        // Reconcile by ID: a snapshot reload may already contain this entry.
+        const existing = state.notifications.findIndex((n) => n.id === ev.data.id);
+        if (existing >= 0) state.notifications[existing] = ev.data;
+        else state.notifications.unshift(ev.data);
         renderNotifications();
         document.getElementById("stat-notifs").textContent = state.notifications.length;
         updateNavCounts();
