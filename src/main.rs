@@ -1,3 +1,4 @@
+mod bind;
 mod cookies;
 mod db;
 mod logging;
@@ -50,9 +51,10 @@ struct Cli {
 enum Commands {
     /// Run the background scheduler and embedded WebUI server (default)
     Serve {
-        /// Address to bind the WebUI & API server
-        #[arg(long, default_value = "127.0.0.1:8085", env = "PTN_BIND")]
-        bind: SocketAddr,
+        /// Address to bind the WebUI & API server (default 127.0.0.1:8085, or the address
+        /// saved in the WebUI). When set, the WebUI cannot change it.
+        #[arg(long, env = "PTN_BIND")]
+        bind: Option<SocketAddr>,
         /// Run with a system tray icon (Windows, macOS, or Linux with `--features tray`)
         #[arg(long)]
         tray: bool,
@@ -65,9 +67,10 @@ enum Commands {
     },
     /// Run the background scheduler and WebUI with a system tray icon (alias for `serve --tray`)
     Tray {
-        /// Address to bind the WebUI & API server
-        #[arg(long, default_value = "127.0.0.1:8085", env = "PTN_BIND")]
-        bind: SocketAddr,
+        /// Address to bind the WebUI & API server (default 127.0.0.1:8085, or the address
+        /// saved in the WebUI). When set, the WebUI cannot change it.
+        #[arg(long, env = "PTN_BIND")]
+        bind: Option<SocketAddr>,
         /// Trust X-Forwarded-For / X-Forwarded-Proto / X-Forwarded-Host headers from a reverse proxy
         #[arg(long, env = "PTN_TRUST_PROXY")]
         trust_proxy: bool,
@@ -207,6 +210,13 @@ fn prepare_auth_state(
 ) -> Result<(Arc<std::sync::Mutex<Option<String>>>, bool)> {
     let _ = db.prune_expired_sessions();
 
+    if !bind.ip().is_loopback() && !trust_proxy {
+        warn!(
+            address = %bind,
+            "Binding to a non-loopback address without --trust-proxy. Place PTNotifier behind an HTTPS reverse proxy before exposing it to the internet."
+        );
+    }
+
     if db.count_users()? == 0
         && let Ok(admin_pw) = std::env::var("PTN_ADMIN_PASSWORD")
         && !admin_pw.is_empty()
@@ -245,6 +255,7 @@ struct WebRuntimeOpts {
     setup_token_required: bool,
     trust_proxy: bool,
     allow_private_networks: bool,
+    bind: bind::BindInfo,
 }
 
 fn build_app_state(
@@ -266,6 +277,7 @@ fn build_app_state(
         setup_token_required: opts.setup_token_required,
         trust_proxy: opts.trust_proxy,
         allow_private_networks: opts.allow_private_networks,
+        bind: opts.bind,
     }
 }
 
@@ -311,8 +323,7 @@ fn main() -> Result<()> {
     let cmd = cli.command.unwrap_or(Commands::Serve {
         bind: std::env::var("PTN_BIND")
             .ok()
-            .and_then(|s| s.parse().ok())
-            .unwrap_or_else(|| "127.0.0.1:8085".parse().unwrap()),
+            .and_then(|s| s.trim().parse().ok()),
         tray: default_tray,
         trust_proxy: env_flag("PTN_TRUST_PROXY"),
         allow_private_networks: env_flag("PTN_ALLOW_PRIVATE_NETWORKS"),
@@ -331,16 +342,11 @@ fn main() -> Result<()> {
             allow_private_networks,
         } => {
             security::set_allow_private_networks(allow_private_networks);
-            if !bind.ip().is_loopback() && !trust_proxy {
-                warn!(
-                    address = %bind,
-                    "Binding to a non-loopback address without --trust-proxy. Place PTNotifier behind an HTTPS reverse proxy before exposing it to the internet."
-                );
-            }
+            let (listener, bind_info) = rt.block_on(bind::bind_listener(bind, &db))?;
             let (setup_token_hash, setup_token_required) =
-                prepare_auth_state(&db, bind, trust_proxy)?;
+                prepare_auth_state(&db, bind_info.active, trust_proxy)?;
 
-            let (listener, scheduler, app) = rt.block_on(async {
+            let (scheduler, app) = rt.block_on(async {
                 let scheduler = scheduler::spawn_scheduler(
                     db.clone(),
                     event_tx.clone(),
@@ -358,13 +364,13 @@ fn main() -> Result<()> {
                         setup_token_required,
                         trust_proxy,
                         allow_private_networks,
+                        bind: bind_info,
                     },
                 ));
-                let listener = tokio::net::TcpListener::bind(bind).await?;
-                Ok::<_, anyhow::Error>((listener, scheduler, app))
-            })?;
+                (scheduler, app)
+            });
 
-            info!(address = %bind, db = %db_path.display(), "PTNotifier WebUI listening (tray mode)");
+            info!(address = %bind_info.active, db = %db_path.display(), "PTNotifier WebUI listening (tray mode)");
             // tray -> server: Quit selected in the tray menu.
             let (shutdown_tx, shutdown_rx) = tokio::sync::oneshot::channel::<()>();
             // server -> tray: Ctrl+C received, so the tray loop must exit as well.
@@ -390,7 +396,7 @@ fn main() -> Result<()> {
                 }
             });
 
-            let webui_url = webui_url_from_bind(bind);
+            let webui_url = webui_url_from_bind(bind_info.active);
             let tray_res = tray::run_tray(
                 webui_url,
                 db,
@@ -412,14 +418,9 @@ fn main() -> Result<()> {
             allow_private_networks,
         } => {
             security::set_allow_private_networks(allow_private_networks);
-            if !bind.ip().is_loopback() && !trust_proxy {
-                warn!(
-                    address = %bind,
-                    "Binding to a non-loopback address without --trust-proxy. Place PTNotifier behind an HTTPS reverse proxy before exposing it to the internet."
-                );
-            }
+            let (listener, bind_info) = rt.block_on(bind::bind_listener(bind, &db))?;
             let (setup_token_hash, setup_token_required) =
-                prepare_auth_state(&db, bind, trust_proxy)?;
+                prepare_auth_state(&db, bind_info.active, trust_proxy)?;
 
             rt.block_on(async {
                 let scheduler = scheduler::spawn_scheduler(
@@ -440,11 +441,11 @@ fn main() -> Result<()> {
                         setup_token_required,
                         trust_proxy,
                         allow_private_networks,
+                        bind: bind_info,
                     },
                 ));
 
-                info!(address = %bind, db = %db_path.display(), "PTNotifier WebUI listening");
-                let listener = tokio::net::TcpListener::bind(bind).await?;
+                info!(address = %bind_info.active, db = %db_path.display(), "PTNotifier WebUI listening");
                 axum::serve(
                     listener,
                     app.into_make_service_with_connect_info::<SocketAddr>(),

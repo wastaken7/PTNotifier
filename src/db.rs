@@ -147,6 +147,13 @@ impl Database {
                 token_prefix TEXT NOT NULL,
                 created_at TEXT NOT NULL,
                 last_used_at TEXT
+            );
+
+            -- Server-level options that only take effect on restart. Kept out of the
+            -- generic settings JSON so the regular settings endpoint cannot touch them.
+            CREATE TABLE IF NOT EXISTS server_config (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL
             );",
         )?;
 
@@ -231,6 +238,32 @@ impl Database {
             params![json],
         )?;
         Ok(settings.clone())
+    }
+
+    /// WebUI bind address saved from the WebUI (applied on the next start).
+    pub fn get_saved_bind(&self) -> Result<Option<String>> {
+        let conn = self.conn.lock().unwrap();
+        Ok(conn
+            .query_row(
+                "SELECT value FROM server_config WHERE key = 'bind'",
+                [],
+                |r| r.get(0),
+            )
+            .optional()?)
+    }
+
+    /// Saves (`Some`) or clears (`None`) the WebUI bind address.
+    pub fn set_saved_bind(&self, bind: Option<&str>) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        match bind {
+            Some(v) => conn.execute(
+                "INSERT INTO server_config (key, value) VALUES ('bind', ?1)
+                 ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                params![v],
+            )?,
+            None => conn.execute("DELETE FROM server_config WHERE key = 'bind'", [])?,
+        };
+        Ok(())
     }
 
     fn row_to_tracker(&self, row: &rusqlite::Row<'_>) -> Result<TrackerConfig> {

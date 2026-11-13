@@ -99,6 +99,16 @@ cargo build --release
 
 Open the WebUI at `http://127.0.0.1:8085`.
 
+### Listen address
+
+The WebUI listens on `127.0.0.1:8085` by default. The address is chosen in this order:
+
+1. `--bind` / `PTN_BIND`, if set. The WebUI then shows it as read-only.
+2. The address saved by an administrator under **Settings → Network** (re-entering the password is required). It applies on the next restart.
+3. The default `127.0.0.1:8085`.
+
+If the saved address cannot be bound at startup (port in use, IP no longer on this machine), PTNotifier logs an error and falls back to `127.0.0.1:8085`. To override a bad saved value without the WebUI, start once with `PTN_BIND=127.0.0.1:8085`.
+
 ### Exposing to the Internet
 
 When exposing PTNotifier publicly:

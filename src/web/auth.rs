@@ -231,7 +231,7 @@ pub async fn require_auth_middleware(
     next.run(req).await
 }
 
-fn rate_limited_resp(retry_after: u64) -> Response {
+pub(crate) fn rate_limited_resp(retry_after: u64) -> Response {
     let mut resp = err_resp(
         StatusCode::TOO_MANY_REQUESTS,
         format!("Too many requests. Try again in {retry_after}s."),

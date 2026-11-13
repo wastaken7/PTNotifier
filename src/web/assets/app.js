@@ -99,7 +99,7 @@ function disconnectSSE() {
   }
 }
 
-const ACCOUNT_FORMS = ["tracker-form", "channel-form", "password-form", "rss-token-form", "create-user-form", "settings-form"];
+const ACCOUNT_FORMS = ["tracker-form", "channel-form", "password-form", "rss-token-form", "create-user-form", "settings-form", "bind-form"];
 
 // Drops everything that belongs to the signed-in account so the next user of this tab
 // cannot see it (revealed RSS URL, typed secrets, cached lists, open dialogs).
@@ -122,6 +122,7 @@ function clearAccountState() {
   state.rssTokens = [];
   state.sessions = [];
   state.users = [];
+  state.bind = null;
 }
 
 function handleSessionExpired() {
@@ -419,6 +420,88 @@ function renderSettings() {
   document.getElementById("set-mark-read").checked = state.settings.mark_as_read;
   document.getElementById("set-send-errors").checked = state.settings.send_error_notifications;
 }
+
+const BIND_SOURCE_LABELS = {
+  cli: "set by --bind / PTN_BIND",
+  database: "saved in the WebUI",
+  default: "default",
+  fallback: "fallback: the saved address could not be used",
+};
+
+function isLoopbackBind(value) {
+  const v = (value || "").trim();
+  return v === "" || v.startsWith("127.") || v.startsWith("[::1]:") || v.startsWith("localhost:");
+}
+
+function updateBindWarning() {
+  const value = document.getElementById("bind-address").value;
+  document.getElementById("bind-exposure-warning").style.display =
+    state.bind && !state.bind.locked && !isLoopbackBind(value) ? "block" : "none";
+}
+
+function renderBind() {
+  const b = state.bind;
+  if (!b) return;
+  const status = document.getElementById("bind-status");
+  let text = `Listening on ${b.active} (${BIND_SOURCE_LABELS[b.source] || b.source}).`;
+  if (b.restart_required) text += ` Restart PTNotifier to switch to ${b.next}.`;
+  status.textContent = text;
+
+  document.getElementById("bind-locked").style.display = b.locked ? "block" : "none";
+  document.getElementById("bind-fields").style.display = b.locked ? "none" : "";
+  document.getElementById("bind-actions").style.display = b.locked ? "none" : "";
+  document.getElementById("bind-address").value = b.saved || b.default;
+  document.getElementById("bind-password").value = "";
+  updateBindWarning();
+}
+
+async function loadBind() {
+  if (!isAdmin()) return;
+  try {
+    state.bind = await api("/api/server/bind");
+    renderBind();
+  } catch (err) {
+    document.getElementById("bind-status").textContent = `Could not load network settings: ${err.message}`;
+  }
+}
+
+async function saveBind(bind) {
+  const password = document.getElementById("bind-password").value;
+  if (!password) {
+    showToast("Enter your password to change the listen address");
+    document.getElementById("bind-password").focus();
+    return;
+  }
+  try {
+    state.bind = await api("/api/server/bind", {
+      method: "PUT",
+      body: JSON.stringify({ bind, password }),
+    });
+    renderBind();
+    showToast(state.bind.restart_required ? "Saved. Restart PTNotifier to apply." : "Saved");
+  } catch (err) {
+    showToast(`Error: ${err.message}`);
+  }
+}
+
+document.getElementById("bind-address").addEventListener("input", updateBindWarning);
+
+document.querySelectorAll("[data-bind-preset]").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const input = document.getElementById("bind-address");
+    const m = input.value.trim().match(/:(\d+)$/);
+    const port = m ? m[1] : "8085";
+    input.value = `${btn.dataset.bindPreset}:${port}`;
+    updateBindWarning();
+  });
+});
+
+document.getElementById("bind-form").addEventListener("submit", (e) => {
+  e.preventDefault();
+  saveBind(document.getElementById("bind-address").value.trim() || null);
+});
+
+document.getElementById("btn-bind-reset").addEventListener("click", () => saveBind(null));
 
 function renderRssTokens() {
   const list = document.getElementById("rss-tokens-list");
@@ -1056,6 +1139,9 @@ async function loadAll() {
   renderChannels();
   renderSettings();
   renderLogs();
+  // Once per sign-in: loadAll() also runs after tracker/channel edits and must not
+  // overwrite an address the admin is typing.
+  if (!state.bind) await loadBind();
 }
 
 function connectSSE() {

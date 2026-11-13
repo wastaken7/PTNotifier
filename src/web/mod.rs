@@ -1,6 +1,8 @@
 pub mod auth;
 mod rss;
+mod server;
 
+use crate::bind::BindInfo;
 use crate::db::Database;
 use crate::logging::LogBroadcaster;
 use crate::models::{
@@ -55,6 +57,7 @@ pub struct AppState {
     pub setup_token_required: bool,
     pub trust_proxy: bool,
     pub allow_private_networks: bool,
+    pub bind: BindInfo,
 }
 
 pub fn router(state: AppState) -> Router {
@@ -88,6 +91,10 @@ pub fn router(state: AppState) -> Router {
         .route("/api/auth/rss-tokens/{id}", delete(auth::delete_rss_token))
         .route("/api/users", get(auth::list_users).post(auth::create_user))
         .route("/api/users/{id}", delete(auth::delete_user))
+        .route(
+            "/api/server/bind",
+            get(server::get_bind).put(server::update_bind),
+        )
         .layer(middleware::from_fn_with_state(
             state.clone(),
             auth::require_auth_middleware,
@@ -119,7 +126,7 @@ pub fn err_resp(status: StatusCode, msg: impl Into<String>) -> Response {
     (status, Json(json!({ "error": msg.into() }))).into_response()
 }
 
-fn require_admin(auth: &AuthContext) -> Option<AxumResponse> {
+pub(crate) fn require_admin(auth: &AuthContext) -> Option<AxumResponse> {
     if auth.user.role != UserRole::Admin {
         return Some(err_resp(
             StatusCode::FORBIDDEN,
@@ -739,6 +746,10 @@ mod tests {
             setup_token_required: setup_token.is_some(),
             trust_proxy: false,
             allow_private_networks: false,
+            bind: BindInfo {
+                active: crate::bind::default_bind(),
+                source: crate::bind::BindSource::Default,
+            },
         };
         router(state)
     }
@@ -796,6 +807,73 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn bind_update_requires_password_and_validates_address() {
+        let app = test_app(None);
+        let created = app
+            .clone()
+            .oneshot(
+                Request::post("/api/auth/setup")
+                    .header("content-type", "application/json")
+                    .body(Body::from(
+                        r#"{"username":"admin","password":"very-strong-password-1"}"#,
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(created.status(), StatusCode::CREATED);
+        let cookie = created.headers()[header::SET_COOKIE]
+            .to_str()
+            .unwrap()
+            .split(';')
+            .next()
+            .unwrap()
+            .to_string();
+        let body = axum::body::to_bytes(created.into_body(), 1024 * 64).await.unwrap();
+        let csrf = serde_json::from_slice::<serde_json::Value>(&body).unwrap()["csrf_token"]
+            .as_str()
+            .unwrap()
+            .to_string();
+
+        let put = |payload: &'static str| {
+            let app = app.clone();
+            let (cookie, csrf) = (cookie.clone(), csrf.clone());
+            async move {
+                let resp = app
+                    .oneshot(
+                        Request::put("/api/server/bind")
+                            .header("cookie", cookie)
+                            .header("x-csrf-token", csrf)
+                            .header("content-type", "application/json")
+                            .body(Body::from(payload))
+                            .unwrap(),
+                    )
+                    .await
+                    .unwrap();
+                let status = resp.status();
+                let body = axum::body::to_bytes(resp.into_body(), 1024 * 64).await.unwrap();
+                (status, serde_json::from_slice::<serde_json::Value>(&body).unwrap())
+            }
+        };
+
+        let (status, _) = put(r#"{"bind":"0.0.0.0:8085","password":"wrong-password-x"}"#).await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+
+        let (status, _) = put(r#"{"bind":"not-an-addr","password":"very-strong-password-1"}"#).await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+
+        let (status, json) = put(r#"{"bind":"0.0.0.0:8085","password":"very-strong-password-1"}"#).await;
+        assert_eq!(status, StatusCode::OK, "{json}");
+        assert_eq!(json["saved"], "0.0.0.0:8085");
+        assert_eq!(json["restart_required"], true);
+
+        let (status, json) = put(r#"{"bind":null,"password":"very-strong-password-1"}"#).await;
+        assert_eq!(status, StatusCode::OK);
+        assert!(json["saved"].is_null());
+        assert_eq!(json["restart_required"], false);
     }
 
     #[tokio::test]

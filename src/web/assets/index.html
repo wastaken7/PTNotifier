@@ -303,6 +303,44 @@
             <button type="submit" class="btn primary admin-only">Save settings</button>
           </div>
         </form>
+
+        <form class="panel form-panel admin-only" id="bind-form">
+          <div class="form-section">
+            <h2 class="form-section-title">Network</h2>
+            <p class="lead-sm">
+              Address the WebUI listens on. Changes take effect after PTNotifier is restarted.
+              If the saved address cannot be used at startup, PTNotifier falls back to <code class="mono">127.0.0.1:8085</code>.
+            </p>
+            <div class="sub-meta" id="bind-status"></div>
+            <div class="hint" id="bind-locked" style="display:none">
+              The address is set by <code class="mono">--bind</code> / <code class="mono">PTN_BIND</code> and cannot be changed here.
+            </div>
+            <div class="form-grid" id="bind-fields">
+              <label class="field">
+                <span class="field-label">Listen address (IP:port)</span>
+                <input type="text" class="input mono" id="bind-address" placeholder="127.0.0.1:8085" maxlength="64" spellcheck="false" autocomplete="off" />
+              </label>
+              <label class="field">
+                <span class="field-label">Your password (required to change)</span>
+                <input type="password" class="input" id="bind-password" autocomplete="current-password" />
+              </label>
+              <div class="field full row-gap">
+                <button type="button" class="btn sm" data-bind-preset="127.0.0.1">This computer only</button>
+                <button type="button" class="btn sm" data-bind-preset="0.0.0.0">All network interfaces</button>
+              </div>
+            </div>
+            <div class="hint" id="bind-exposure-warning" style="display:none">
+              <strong>Reachable from other devices.</strong> Without HTTPS, your password and session cookie travel
+              unencrypted on the network: only use this on a network you trust. To access PTNotifier over the internet,
+              put it behind an HTTPS reverse proxy and start it with <code class="mono">--trust-proxy</code> instead of
+              forwarding the port on your router. Windows may ask to allow PTNotifier through the firewall.
+            </div>
+          </div>
+          <div class="form-actions" id="bind-actions">
+            <button type="button" class="btn" id="btn-bind-reset">Reset to default</button>
+            <button type="submit" class="btn primary">Save address</button>
+          </div>
+        </form>
       </section>
 
       <!-- SECURITY TAB -->
