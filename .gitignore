@@ -1,8 +1,29 @@
-__pycache__/
-cookies/
-state/
-debug/
-config.py
+# Rust / Cargo
+/target/
+**/*.rs.bk
+*.pdb
+
+# Environment & Secrets
+.env
+.env.*
+!.env.example
+
+# Database & Runtime State
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Editors / IDEs
 .vscode/
-.venv/
-.ruff_cache/
+.idea/
+*.swp
+*.swo
+*~

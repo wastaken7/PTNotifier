@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PTNotifier</title>
+  <link rel="icon" type="image/svg+xml" href="/assets/icon.svg" />
+  <link rel="icon" type="image/png" href="/assets/icon.png" />
+  <link rel="alternate" type="application/rss+xml" title="PTNotifier RSS" href="/rss" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap"
+    rel="stylesheet"
+  />
+  <link rel="stylesheet" href="/assets/style.css" />
+</head>
+
+<body>
+  <!-- AUTH SCREEN (SETUP / LOGIN) -->
+  <div class="auth-shell" id="auth-screen" style="display:none">
+    <div class="auth-card">
+      <div class="auth-brand">
+        <img src="/assets/icon.svg" alt="PTNotifier" class="brand-icon" />
+        <div>
+          <div class="brand-name">PTNotifier</div>
+          <div class="auth-subtitle" id="auth-subtitle">Sign in to continue</div>
+        </div>
+      </div>
+
+      <div class="auth-error" id="auth-error" style="display:none" role="alert"></div>
+
+      <form id="setup-form" style="display:none">
+        <div class="form-grid single-col">
+          <label class="field">
+            <span class="field-label">Administrator username</span>
+            <input type="text" class="input" id="setup-username" value="admin" autocomplete="username" minlength="3" maxlength="64" required />
+          </label>
+          <label class="field">
+            <span class="field-label">Password (min 10 characters)</span>
+            <input type="password" class="input" id="setup-password" autocomplete="new-password" minlength="10" maxlength="128" required />
+          </label>
+          <label class="field">
+            <span class="field-label">Confirm password</span>
+            <input type="password" class="input" id="setup-password-confirm" autocomplete="new-password" minlength="10" maxlength="128" required />
+          </label>
+          <label class="field" id="setup-token-wrap" style="display:none">
+            <span class="field-label">One-time setup token (from server startup logs)</span>
+            <input type="text" class="input mono" id="setup-token" autocomplete="off" />
+          </label>
+        </div>
+        <div class="form-actions">
+          <button type="submit" class="btn primary full-width">Create administrator account</button>
+        </div>
+      </form>
+
+      <form id="login-form" style="display:none">
+        <div class="form-grid single-col">
+          <label class="field">
+            <span class="field-label">Username</span>
+            <input type="text" class="input" id="login-username" autocomplete="username" required />
+          </label>
+          <label class="field">
+            <span class="field-label">Password</span>
+            <input type="password" class="input" id="login-password" autocomplete="current-password" required />
+          </label>
+        </div>
+        <div class="form-actions">
+          <button type="submit" class="btn primary full-width">Sign in</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MAIN APPLICATION -->
+  <div class="app-shell" id="app-shell" style="display:none">
+    <header class="topbar">
+      <div class="topbar-inner">
+        <div class="brand">
+          <img src="/assets/icon.svg" alt="PTNotifier" class="brand-icon" />
+          <div class="brand-text">
+            <span class="brand-name">PTNotifier</span>
+            <span class="sse-pill" id="sse-indicator" data-state="connecting">
+              <span class="sse-dot" aria-hidden="true"></span>
+              <span class="sse-label">Connecting</span>
+            </span>
+          </div>
+        </div>
+
+        <nav class="nav" aria-label="Primary">
+          <button class="nav-btn active" data-tab="trackers">
+            <span>Trackers</span>
+            <span class="nav-count" id="nav-count-trackers">0</span>
+          </button>
+          <button class="nav-btn" data-tab="notifications">
+            <span>Notifications</span>
+            <span class="nav-count" id="nav-count-notifs">0</span>
+          </button>
+          <button class="nav-btn" data-tab="channels">
+            <span>Channels</span>
+            <span class="nav-count" id="nav-count-channels">0</span>
+          </button>
+          <button class="nav-btn" data-tab="logs">
+            <span>Live logs</span>
+          </button>
+          <button class="nav-btn" data-tab="settings">
+            <span>Settings</span>
+          </button>
+          <button class="nav-btn" data-tab="security">
+            <span>Security</span>
+          </button>
+        </nav>
+
+        <div class="topbar-user">
+          <span class="user-pill" id="current-user-pill"></span>
+          <button class="btn sm" type="button" id="btn-logout">Sign out</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="main">
+      <!-- TRACKERS TAB -->
+      <section class="tab active" id="tab-trackers">
+        <div class="page-header">
+          <div>
+            <h1>Trackers</h1>
+            <p class="lead">Monitor tracker sessions, cookie health, and check schedules.</p>
+          </div>
+          <div class="header-actions">
+            <button class="btn primary admin-only" id="btn-add-tracker">Add tracker</button>
+          </div>
+        </div>
+
+        <div class="telemetry-strip" id="stats-grid" aria-label="Tracker summary">
+          <div class="telemetry-cell">
+            <span class="telemetry-label">Configured</span>
+            <span class="telemetry-val" id="stat-total">0</span>
+          </div>
+          <div class="telemetry-cell is-ok">
+            <span class="telemetry-label">Healthy</span>
+            <span class="telemetry-val" id="stat-ok">0</span>
+          </div>
+          <div class="telemetry-cell is-warn">
+            <span class="telemetry-label">Needs attention</span>
+            <span class="telemetry-val" id="stat-err">0</span>
+          </div>
+          <div class="telemetry-cell">
+            <span class="telemetry-label">Captured items</span>
+            <span class="telemetry-val" id="stat-notifs">0</span>
+          </div>
+        </div>
+
+        <div class="toolbar">
+          <div class="search-wrap">
+            <input
+              type="search"
+              class="input sm"
+              id="filter-tracker-search"
+              placeholder="Filter by name, type, or domain"
+              aria-label="Filter trackers"
+            />
+          </div>
+          <select id="filter-tracker-status" class="input sm" aria-label="Filter by status">
+            <option value="">All statuses</option>
+            <option value="ok">Healthy</option>
+            <option value="attention">Needs attention</option>
+            <option value="paused">Paused</option>
+          </select>
+        </div>
+
+        <div class="panel">
+          <div class="table-wrap">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>Tracker</th>
+                  <th>Engine</th>
+                  <th>Status</th>
+                  <th>Last check</th>
+                  <th>Next check</th>
+                  <th class="right">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="trackers-tbody"></tbody>
+            </table>
+          </div>
+          <div class="empty-state" id="trackers-empty" style="display:none">
+            <p class="empty-title">No trackers configured yet</p>
+            <p class="empty-desc">Add your first private tracker to begin monitoring notifications and session cookies.</p>
+            <button class="btn primary admin-only" type="button" id="btn-empty-add-tracker">Add tracker</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- NOTIFICATIONS TAB -->
+      <section class="tab" id="tab-notifications">
+        <div class="page-header">
+          <div>
+            <h1>Notifications</h1>
+            <p class="lead">Recent alerts and private messages captured from your trackers.</p>
+          </div>
+          <div class="header-actions">
+            <select id="filter-notif-type" class="input sm" aria-label="Filter notification type">
+              <option value="">All types</option>
+              <option value="notification">Notifications</option>
+              <option value="message">Private messages</option>
+              <option value="error">Errors</option>
+            </select>
+            <a class="btn" id="btn-rss-feed" href="/rss" target="_blank" rel="noreferrer">RSS Feed</a>
+            <button class="btn" id="btn-refresh-notifs">Refresh</button>
+          </div>
+        </div>
+
+        <div id="notifications-list" class="feed-list"></div>
+      </section>
+
+      <!-- CHANNELS TAB -->
+      <section class="tab" id="tab-channels">
+        <div class="page-header">
+          <div>
+            <h1>Channels</h1>
+            <p class="lead">Route notifications, private messages, and cookie errors to your delivery targets.</p>
+          </div>
+          <div class="header-actions">
+            <button class="btn primary admin-only" id="btn-add-channel">Add channel</button>
+          </div>
+        </div>
+
+        <div id="channels-grid" class="channels-grid"></div>
+      </section>
+
+      <!-- LOGS TAB -->
+      <section class="tab" id="tab-logs">
+        <div class="page-header">
+          <div>
+            <h1>Live logs</h1>
+            <p class="lead">Real-time daemon output streamed over Server-Sent Events.</p>
+          </div>
+          <div class="header-actions">
+            <select id="filter-log-level" class="input sm" aria-label="Filter log level">
+              <option value="ALL">All levels</option>
+              <option value="INFO">Info and above</option>
+              <option value="WARN">Warnings and errors</option>
+              <option value="ERROR">Errors only</option>
+            </select>
+            <button class="btn" id="btn-clear-logs">Clear view</button>
+          </div>
+        </div>
+
+        <div class="log-well" id="log-box" role="log" aria-live="polite"></div>
+      </section>
+
+      <!-- SETTINGS TAB -->
+      <section class="tab" id="tab-settings">
+        <div class="page-header">
+          <div>
+            <h1>Settings</h1>
+            <p class="lead">Default polling cadence, request throttling, and error alerting.</p>
+          </div>
+        </div>
+
+        <form class="panel form-panel" id="settings-form">
+          <div class="form-section">
+            <h2 class="form-section-title">Polling and network</h2>
+            <div class="form-grid">
+              <label class="field">
+                <span class="field-label">Default check interval (seconds)</span>
+                <input type="number" class="input mono" id="set-interval" min="60" required />
+              </label>
+              <label class="field">
+                <span class="field-label">Request delay (seconds)</span>
+                <input type="number" class="input mono" id="set-delay" min="0" max="300" step="0.5" required />
+              </label>
+              <label class="field">
+                <span class="field-label">HTTP timeout (seconds)</span>
+                <input type="number" class="input mono" id="set-timeout" min="5" max="300" step="1" required />
+              </label>
+              <label class="field">
+                <span class="field-label">Discord embed limit</span>
+                <input type="number" class="input mono" id="set-discord-limit" min="256" max="4096" required />
+              </label>
+            </div>
+          </div>
+
+          <div class="form-divider"></div>
+
+          <div class="form-section">
+            <h2 class="form-section-title">Delivery behavior</h2>
+            <div class="check-stack">
+              <label class="checkbox">
+                <input type="checkbox" id="set-mark-read" />
+                <span>Mark notifications as read on supported trackers</span>
+              </label>
+              <label class="checkbox">
+                <input type="checkbox" id="set-send-errors" />
+                <span>Send error alerts to channels with error routing enabled</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="form-actions">
+            <button type="submit" class="btn primary admin-only">Save settings</button>
+          </div>
+        </form>
+      </section>
+
+      <!-- SECURITY TAB -->
+      <section class="tab" id="tab-security">
+        <div class="page-header">
+          <div>
+            <h1>Security</h1>
+            <p class="lead">Manage your password, RSS feed tokens, active sessions, and user accounts.</p>
+          </div>
+        </div>
+
+        <div class="security-stack">
+          <form class="panel form-panel" id="password-form">
+            <div class="form-section">
+              <h2 class="form-section-title">Change password</h2>
+              <div class="form-grid">
+                <label class="field full">
+                  <span class="field-label">Current password</span>
+                  <input type="password" class="input" id="pw-current" autocomplete="current-password" required />
+                </label>
+                <label class="field">
+                  <span class="field-label">New password (min 10 characters)</span>
+                  <input type="password" class="input" id="pw-new" autocomplete="new-password" minlength="10" maxlength="128" required />
+                </label>
+                <label class="field">
+                  <span class="field-label">Confirm new password</span>
+                  <input type="password" class="input" id="pw-confirm" autocomplete="new-password" minlength="10" maxlength="128" required />
+                </label>
+              </div>
+            </div>
+            <div class="form-actions">
+              <button type="submit" class="btn primary">Update password</button>
+            </div>
+          </form>
+
+          <div class="panel form-panel">
+            <div class="form-section">
+              <h2 class="form-section-title">RSS feed access tokens</h2>
+              <p class="lead-sm">RSS readers do not use browser cookies. Generate a dedicated feed token to subscribe safely over the internet.</p>
+              <form id="rss-token-form" class="inline-form">
+                <input type="text" class="input sm" id="rss-token-label" placeholder="Label (e.g. FreshRSS)" maxlength="64" />
+                <button type="submit" class="btn primary sm">Generate token</button>
+              </form>
+              <div class="hint" id="rss-token-reveal" style="display:none">
+                <div><strong>Copy your RSS URL now</strong> — this token will not be shown again:</div>
+                <div class="token-copy-row">
+                  <code id="rss-token-url" class="mono"></code>
+                  <button type="button" class="btn sm" id="btn-copy-rss-url">Copy URL</button>
+                </div>
+              </div>
+              <div id="rss-tokens-list" class="sub-list"></div>
+            </div>
+          </div>
+
+          <div class="panel form-panel">
+            <div class="form-section">
+              <div class="section-head-row">
+                <h2 class="form-section-title">Active sessions</h2>
+                <button type="button" class="btn sm" id="btn-revoke-other-sessions">Sign out other sessions</button>
+              </div>
+              <div id="sessions-list" class="sub-list"></div>
+            </div>
+          </div>
+
+          <div class="panel form-panel admin-only" id="users-panel">
+            <div class="form-section">
+              <h2 class="form-section-title">User accounts</h2>
+              <form id="create-user-form" class="inline-form wrap">
+                <input type="text" class="input sm" id="new-user-name" placeholder="Username" minlength="3" maxlength="64" required />
+                <input type="password" class="input sm" id="new-user-pw" placeholder="Password (min 10 chars)" minlength="10" maxlength="128" required />
+                <select class="input sm" id="new-user-role">
+                  <option value="user">Viewer (read-only)</option>
+                  <option value="admin">Administrator</option>
+                </select>
+                <button type="submit" class="btn primary sm">Create user</button>
+              </form>
+              <div id="users-list" class="sub-list"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- TRACKER MODAL -->
+  <div class="modal-backdrop" id="tracker-modal" style="display:none" role="dialog" aria-modal="true" aria-labelledby="tracker-modal-title">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 id="tracker-modal-title">Add tracker</h2>
+        <button class="icon-btn" type="button" data-close-modal="tracker-modal" aria-label="Close modal">✕</button>
+      </div>
+      <form id="tracker-form">
+        <input type="hidden" id="tr-id" />
+        <div class="form-grid">
+          <label class="field">
+            <span class="field-label">Preset</span>
+            <select class="input" id="tr-kind" required></select>
+          </label>
+          <label class="field">
+            <span class="field-label">Display name</span>
+            <input type="text" class="input" id="tr-name" placeholder="e.g. My UNIT3D" required />
+          </label>
+          <label class="field full">
+            <span class="field-label">Base URL</span>
+            <input type="url" class="input mono" id="tr-url" placeholder="https://..." required />
+          </label>
+          <label class="field">
+            <span class="field-label">Check interval override (seconds)</span>
+            <input type="number" class="input mono" id="tr-interval" min="60" placeholder="Use global default" />
+          </label>
+          <label class="field">
+            <span class="field-label">Mark as read</span>
+            <select class="input" id="tr-mark-read">
+              <option value="">Use global default</option>
+              <option value="true">Yes</option>
+              <option value="false">No</option>
+            </select>
+          </label>
+        </div>
+
+        <div id="tr-preset-notes" class="hint" style="display:none"></div>
+
+        <label class="field block" id="tr-cookies-wrap">
+          <div class="label-row">
+            <span class="field-label">Cookies (Netscape cookies.txt or raw Cookie header)</span>
+            <input type="file" id="tr-cookie-file" accept=".txt" class="file-input" />
+          </div>
+          <textarea class="input mono" id="tr-cookies" rows="5"
+            placeholder="# Netscape HTTP Cookie File... or Cookie: uid=123; pass=abc"></textarea>
+        </label>
+        <label class="checkbox block-check" id="tr-clear-cookies-wrap" style="display:none">
+          <input type="checkbox" id="tr-clear-cookies" />
+          <span>Clear saved cookies</span>
+        </label>
+
+        <label class="field block" id="tr-token-wrap">
+          <span class="field-label">API token</span>
+          <input type="text" class="input mono" id="tr-token" placeholder="API key (for Anthelion / Orpheus)" />
+        </label>
+        <label class="checkbox block-check" id="tr-clear-token-wrap" style="display:none">
+          <input type="checkbox" id="tr-clear-token" />
+          <span>Clear saved API token</span>
+        </label>
+
+        <label class="field block">
+          <span class="field-label">Ignore patterns (one per line; wrap in /regex/ for regex)</span>
+          <textarea class="input mono" id="tr-ignore" rows="3"
+            placeholder="torrent deleted&#10;/your class has changed/"></textarea>
+        </label>
+
+        <label class="checkbox block-check">
+          <input type="checkbox" id="tr-enabled" checked />
+          <span>Enable scheduled checks</span>
+        </label>
+
+        <div class="modal-footer">
+          <button type="button" class="btn" data-close-modal="tracker-modal">Cancel</button>
+          <button type="submit" class="btn primary">Save tracker</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- CHANNEL MODAL -->
+  <div class="modal-backdrop" id="channel-modal" style="display:none" role="dialog" aria-modal="true" aria-labelledby="channel-modal-title">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 id="channel-modal-title">Add channel</h2>
+        <button class="icon-btn" type="button" data-close-modal="channel-modal" aria-label="Close modal">✕</button>
+      </div>
+      <form id="channel-form">
+        <input type="hidden" id="ch-id" />
+        <div class="form-grid">
+          <label class="field">
+            <span class="field-label">Channel name</span>
+            <input type="text" class="input" id="ch-name" placeholder="e.g. Personal Discord" required />
+          </label>
+          <label class="field">
+            <span class="field-label">Provider</span>
+            <select class="input" id="ch-kind">
+              <option value="discord">Discord Webhook</option>
+              <option value="telegram">Telegram Bot</option>
+              <option value="gotify">Gotify</option>
+              <option value="ntfy">ntfy</option>
+            </select>
+          </label>
+        </div>
+
+        <div id="ch-fields" class="form-grid" style="margin-top: 14px;"></div>
+
+        <div class="check-row">
+          <label class="checkbox"><input type="checkbox" id="ch-enabled" checked /> <span>Enabled</span></label>
+          <label class="checkbox"><input type="checkbox" id="ch-notifs" checked /> <span>Notifications</span></label>
+          <label class="checkbox"><input type="checkbox" id="ch-pms" checked /> <span>Private messages</span></label>
+          <label class="checkbox"><input type="checkbox" id="ch-errors" /> <span>Errors and cookie expiry</span></label>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn" data-close-modal="channel-modal">Cancel</button>
+          <button type="submit" class="btn primary">Save channel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="/assets/app.js"></script>
+</body>
+
+</html>

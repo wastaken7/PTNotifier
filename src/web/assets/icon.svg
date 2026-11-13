@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="bg-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1B242C" />
+      <stop offset="100%" stop-color="#0F1418" />
+    </linearGradient>
+    <linearGradient id="bell-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F3C15A" />
+      <stop offset="60%" stop-color="#E5A93C" />
+      <stop offset="100%" stop-color="#C98A22" />
+    </linearGradient>
+  </defs>
+
+  <rect x="2" y="2" width="60" height="60" rx="14" fill="url(#bg-grad)" stroke="#25303A" stroke-width="2" />
+
+  <path
+    d="M32 13c-1.66 0-3 1.34-3 3v1.26C23.38 18.63 19.5 23.62 19.5 29.5v8.75l-3.2 3.2c-.63.63-.18 1.75.71 1.75h29.98c.89 0 1.34-1.12.71-1.75l-3.2-3.2V29.5c0-5.88-3.88-10.87-9.5-12.24V16c0-1.66-1.34-3-3-3z"
+    fill="url(#bell-grad)"
+  />
+
+  <path
+    d="M27.2 45.5c.72 2.32 2.61 4 4.8 4s4.08-1.68 4.8-4h-9.6z"
+    fill="#F3C15A"
+  />
+
+  <circle cx="45" cy="19" r="7.5" fill="#0F1418" />
+  <circle cx="45" cy="19" r="5" fill="#34D399" />
+</svg>

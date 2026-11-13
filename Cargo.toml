@@ -1,0 +1,48 @@
+[package]
+name = "ptnotifier"
+version = "0.1.0"
+edition = "2024"
+description = "Private Tracker Notification & PM Monitor with WebUI"
+
+[[bin]]
+name = "ptn"
+path = "src/main.rs"
+
+[features]
+default = []
+tray = ["dep:tray-icon", "dep:winit"]
+
+[dependencies]
+anyhow = "1"
+argon2 = "0.5"
+axum = { version = "0.8", features = ["macros"] }
+base64 = "0.22"
+chrono = { version = "0.4", features = ["serde"] }
+clap = { version = "4", features = ["derive", "env"] }
+futures = "0.3"
+image = { version = "0.25", default-features = false, features = ["ico", "png", "jpeg", "webp"] }
+regex = "1"
+reqwest = { version = "0.12", default-features = false, features = ["json", "cookies", "http2", "multipart", "rustls-tls", "gzip", "deflate"] }
+ring = "0.17"
+rusqlite = { version = "0.32", features = ["bundled"] }
+scraper = "0.22"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["full"] }
+tokio-stream = { version = "0.1", features = ["sync"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+tray-icon = { version = "0.19", optional = true }
+url = "2"
+uuid = { version = "1", features = ["v4"] }
+winit = { version = "0.30", optional = true }
+
+[target.'cfg(any(target_os = "windows", target_os = "macos"))'.dependencies]
+tray-icon = "0.19"
+winit = "0.30"
+
+[target.'cfg(windows)'.build-dependencies]
+winresource = "0.1"
+
+[dev-dependencies]
+tower = { version = "0.5", features = ["util"] }
