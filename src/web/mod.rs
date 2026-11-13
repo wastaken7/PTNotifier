@@ -1,4 +1,5 @@
 pub mod auth;
+mod import;
 mod rss;
 mod server;
 
@@ -71,6 +72,11 @@ pub fn router(state: AppState) -> Router {
             put(update_tracker).delete(delete_tracker),
         )
         .route("/api/trackers/{id}/run", post(run_tracker_now))
+        .route(
+            "/api/trackers/import",
+            // Many cookie files in one request: allow more than the global body limit.
+            post(import::import_cookies).layer(DefaultBodyLimit::max(import::MAX_IMPORT_BODY_BYTES)),
+        )
         .route("/api/channels", get(list_channels).post(create_channel))
         .route(
             "/api/channels/{id}",
@@ -708,9 +714,11 @@ async fn sse_events(
         }
     };
 
+    // A `Lagged` error means this client missed events: end the stream so the browser
+    // reconnects and reloads its snapshot, instead of silently continuing with gaps.
     let stream = BroadcastStream::new(rx)
-        .filter_map(Result::ok)
-        .map_while(move |ev| {
+        .map_while(move |res| {
+            let ev = res.ok()?;
             if !session_active() {
                 return None;
             }

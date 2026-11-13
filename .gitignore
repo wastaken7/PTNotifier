@@ -8,6 +8,15 @@
 .env.*
 !.env.example
 .ptn_master.key
+ptnotifier.env
+
+# Legacy Python version (may still exist in upgraded checkouts and hold credentials)
+config.py
+cookies/
+state/
+debug/
+__pycache__/
+.venv/
 
 # Database & Runtime State
 *.db

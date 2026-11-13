@@ -148,7 +148,26 @@ pub async fn execute_tracker_check(
                     "First check complete: seeded existing items without notifying"
                 );
             } else {
-                let channels = db.list_channels().unwrap_or_default();
+                // Without the channel list nothing can be delivered: stop before any item is
+                // marked processed or read, so the next check retries them.
+                let channels = match db.list_channels() {
+                    Ok(c) => c,
+                    Err(e) => {
+                        let msg = format!("Could not load notification channels: {e:#}");
+                        error!(tracker = %tracker.name, "{msg}");
+                        if let Ok(Some(updated)) = db.update_tracker_runtime(
+                            tracker_id,
+                            TrackerStatus::Error,
+                            Some(&msg),
+                            Some(&now_str),
+                            Some(&next_str),
+                            &tracker.state,
+                        ) {
+                            let _ = event_tx.send(UiEvent::TrackerUpdated(updated.to_public()));
+                        }
+                        return Err(e.context("loading notification channels"));
+                    }
+                };
                 // Forget pending retries for items the tracker no longer reports (e.g. read elsewhere).
                 let current_ids: HashSet<&str> = items.iter().map(|i| i.id.as_str()).collect();
                 ctx.state
@@ -256,7 +275,10 @@ pub async fn execute_tracker_check(
             error!(tracker = %tracker.name, error = %msg, "Tracker check failed");
 
             if settings.send_error_notifications {
-                let channels = db.list_channels().unwrap_or_default();
+                let channels = db.list_channels().unwrap_or_else(|e| {
+                    warn!(tracker = %tracker.name, "Could not load channels for the error notification: {e:#}");
+                    Vec::new()
+                });
                 let err_item = NotificationItem {
                     item_type: ItemType::Error,
                     id: format!("err-{}", now.timestamp()),
@@ -351,6 +373,17 @@ pub fn spawn_scheduler(
             due_ids.sort();
 
             for id in due_ids {
+                // The tracker may have been disabled (or deleted) while earlier checks ran.
+                // (A lookup error is left to execute_tracker_check, which reports it.)
+                let gone_or_disabled = match db.get_tracker(&id) {
+                    Ok(Some(t)) => !t.enabled,
+                    Ok(None) => true,
+                    Err(_) => false,
+                };
+                if gone_or_disabled {
+                    schedule.remove(&id);
+                    continue;
+                }
                 if let Err(e) =
                     execute_tracker_check(&db, rate_limiter.clone(), &event_tx, &notify_client, &id)
                         .await

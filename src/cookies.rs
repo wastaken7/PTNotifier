@@ -76,10 +76,55 @@ pub fn build_cookie_jar(raw_cookies: &str, base_url: &str) -> Arc<Jar> {
     jar
 }
 
+/// Domains found in a Netscape `cookies.txt`, normalized (lowercase, no leading `.` or `www.`)
+/// and ordered by how many cookies each one holds (most first). Empty for raw `Cookie:` headers,
+/// which carry no domain.
+pub fn cookie_domains(raw_cookies: &str) -> Vec<String> {
+    let mut counts: Vec<(String, usize)> = Vec::new();
+    for line in raw_cookies.lines() {
+        let line = line.trim();
+        if line.is_empty() || (line.starts_with('#') && !line.starts_with("#HttpOnly_")) {
+            continue;
+        }
+        let clean = line.strip_prefix("#HttpOnly_").unwrap_or(line);
+        let parts: Vec<&str> = clean.split('\t').collect();
+        if parts.len() < 7 || parts[5].trim().is_empty() {
+            continue;
+        }
+        let domain = normalize_host(parts[0]);
+        if domain.is_empty() {
+            continue;
+        }
+        match counts.iter_mut().find(|(d, _)| *d == domain) {
+            Some((_, n)) => *n += 1,
+            None => counts.push((domain, 1)),
+        }
+    }
+    // Stable sort keeps file order among equally common domains.
+    counts.sort_by_key(|c| std::cmp::Reverse(c.1));
+    counts.into_iter().map(|(d, _)| d).collect()
+}
+
+/// Lowercases a host and strips a leading `.` and `www.`.
+pub fn normalize_host(host: &str) -> String {
+    let h = host.trim().trim_start_matches('.').to_ascii_lowercase();
+    h.strip_prefix("www.").map(str::to_string).unwrap_or(h)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use reqwest::cookie::CookieStore;
+
+    #[test]
+    fn extracts_cookie_domains_by_frequency() {
+        let raw = "# Netscape HTTP Cookie File\n\
+.www.Aither.cc\tTRUE\t/\tTRUE\t0\ta\t1\n\
+#HttpOnly_aither.cc\tFALSE\t/\tTRUE\t0\tb\t2\n\
+cdn.other.net\tFALSE\t/\tTRUE\t0\tc\t3\n";
+        assert_eq!(cookie_domains(raw), vec!["aither.cc", "cdn.other.net"]);
+        assert!(cookie_domains("Cookie: uid=1; pass=2").is_empty());
+    }
 
     #[test]
     fn parses_netscape_cookies_txt() {

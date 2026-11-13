@@ -104,7 +104,14 @@ pub async fn update_bind(
         .filter(|s| !s.is_empty());
 
     let to_save = match requested {
-        None => None,
+        None => {
+            // The default address is bound without fallback at startup, so make sure it is
+            // usable before dropping the saved address.
+            if let Err(e) = bind::probe_bind(bind::default_bind(), state.bind.active) {
+                return err_resp(StatusCode::BAD_REQUEST, format!("{e:#}"));
+            }
+            None
+        }
         Some(raw) => {
             let addr = match bind::parse_bind(raw) {
                 Ok(a) => a,

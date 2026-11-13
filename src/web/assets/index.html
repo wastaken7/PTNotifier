@@ -128,6 +128,7 @@
             <p class="lead">Monitor tracker sessions, cookie health, and check schedules.</p>
           </div>
           <div class="header-actions">
+            <button class="btn admin-only" type="button" id="btn-import-cookies">Import cookies</button>
             <button class="btn primary admin-only" id="btn-add-tracker">Add tracker</button>
           </div>
         </div>
@@ -499,6 +500,50 @@
         <div class="modal-footer">
           <button type="button" class="btn" data-close-modal="tracker-modal">Cancel</button>
           <button type="submit" class="btn primary">Save tracker</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- COOKIE IMPORT MODAL -->
+  <div class="modal-backdrop" id="import-modal" style="display:none" role="dialog" aria-modal="true" aria-labelledby="import-modal-title">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 id="import-modal-title">Import cookies</h2>
+        <button class="icon-btn" type="button" data-close-modal="import-modal" aria-label="Close modal">✕</button>
+      </div>
+      <form id="import-form">
+        <p class="hint">
+          One tracker per <span class="mono">cookies.txt</span> file (Netscape format), identified by the cookies' domain.
+          Sites with their own preset and the AvistaZ network are detected automatically; for generic engines
+          (UNIT3D, NexusPHP) choose the type and the address is taken from the cookies.
+        </p>
+        <div class="form-grid">
+          <label class="field">
+            <span class="field-label">Tracker type</span>
+            <select class="input" id="imp-kind"></select>
+          </label>
+          <label class="field">
+            <span class="field-label">Cookie files</span>
+            <input type="file" class="file-input" id="imp-files" accept=".txt,text/plain" multiple />
+          </label>
+          <label class="field full">
+            <span class="field-label">…or a whole folder</span>
+            <input type="file" class="file-input" id="imp-folder" webkitdirectory multiple />
+          </label>
+        </div>
+        <div class="hint" id="imp-selection">No files selected.</div>
+
+        <label class="checkbox block-check">
+          <input type="checkbox" id="imp-update" checked />
+          <span>Replace the cookies of trackers that already exist (refresh expired cookies)</span>
+        </label>
+
+        <div class="sub-list" id="imp-results" aria-live="polite"></div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn" data-close-modal="import-modal">Close</button>
+          <button type="submit" class="btn primary" id="imp-submit">Import</button>
         </div>
       </form>
     </div>

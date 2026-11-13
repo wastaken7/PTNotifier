@@ -239,7 +239,19 @@ pub async fn fetch_orpheus(ctx: &mut TrackerContext) -> Result<Vec<NotificationI
             .get("convId")
             .map(|v| v.to_string().trim_matches('"').to_string())
             .unwrap_or_default();
-        if conv_id.is_empty() || ctx.is_processed(&conv_id) {
+        if conv_id.is_empty() {
+            continue;
+        }
+        // A conversation keeps its ID across replies, so key each update by the conversation
+        // plus the date of its latest message: a new reply yields a new item.
+        let last_date = msg.get("date").and_then(|v| v.as_str()).unwrap_or_default();
+        let item_id = format!("{conv_id}@{last_date}");
+        if ctx.is_processed(&item_id) {
+            continue;
+        }
+        // Our own replies also bump the date; only conversations with something unread for
+        // us are new (older API responses without the flag are treated as unread).
+        if msg.get("unread").and_then(|v| v.as_bool()) == Some(false) {
             continue;
         }
 
@@ -270,7 +282,7 @@ pub async fn fetch_orpheus(ctx: &mut TrackerContext) -> Result<Vec<NotificationI
 
         items.push(NotificationItem {
             item_type: ItemType::Message,
-            id: conv_id.clone(),
+            id: item_id,
             title: None,
             subject: Some(
                 msg.get("subject")

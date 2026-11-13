@@ -58,19 +58,30 @@ fn parse_notifications(
         let date = text_clean(cols[0]);
         let title_link = cols[1].select(&sel("a[href]")).next();
         let title = title_link.map(text_clean).unwrap_or_else(|| text_clean(cols[1]));
-        let link = title_link
+        let href = title_link
             .and_then(|a| a.value().attr("href"))
-            .map(|h| ctx.join_url(h))
-            .unwrap_or_else(|| notif_url.to_string());
+            .map(|h| ctx.join_url(h));
         let subject = text_clean(cols[2]);
+        // Linked rows are keyed by their destination. Linkless rows would all share the
+        // notifications-page URL, so key them by their (stable) content instead; the date
+        // cell is left out because it may be rendered relative to now.
+        let id = match &href {
+            Some(link) => link.clone(),
+            None => format!(
+                "{notif_url}#{}",
+                &crate::security::sha256_hex(&format!("{title}
+{subject}"))[..16]
+            ),
+        };
+        let link = href.unwrap_or_else(|| notif_url.to_string());
 
-        if ctx.is_processed(&link) {
+        if ctx.is_processed(&id) {
             continue;
         }
 
         items.push(NotificationItem {
             item_type: ItemType::Notification,
-            id: link.clone(),
+            id,
             title: Some(title),
             subject: Some(subject),
             sender: None,

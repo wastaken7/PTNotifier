@@ -14,6 +14,7 @@ Private tracker notification and private message (PM) monitor written in Rust, f
   - Binds to `127.0.0.1:8085` by default for safe local use.
 - **Background Scheduler**: periodically polls enabled trackers while respecting the global request delay (`request_delay_secs`) and per-tracker minimum intervals.
 - **Flexible Authentication**: accepts Netscape/Mozilla `cookies.txt` format or raw `Cookie: key=value; ...` headers, as well as `api_token` where supported.
+- **Bulk Cookie Import**: *Trackers → Import cookies* takes many `cookies.txt` files (or a whole folder) at once and creates one tracker per file, identified by the cookies' domain. Sites with their own preset and the AvistaZ network are detected automatically; for generic UNIT3D/NexusPHP trackers pick the type and the URL is taken from the cookies. Re-importing refreshes the cookies of trackers that already exist.
 - **Filtering & Actions**:
   - Per-tracker `ignore_patterns` list.
   - Optional `mark_as_read` setting (global or per-tracker override).

@@ -164,6 +164,9 @@ jobs:
     name: Publish GitHub Release
     needs: [resolve, build]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: write
 
     steps:
       - name: Download all artifacts
@@ -184,3 +187,11 @@ jobs:
           target_commitish: ${{ needs.resolve.outputs.sha }}
           generate_release_notes: true
           files: dist/*
+
+      # Releases created with GITHUB_TOKEN do not trigger `release: published` workflows,
+      # so start the Docker publication explicitly, on the release tag.
+      - name: Trigger Docker image publication
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+        run: gh workflow run docker.yaml --repo "$GITHUB_REPOSITORY" --ref "$TAG" -f use_latest_tag=true

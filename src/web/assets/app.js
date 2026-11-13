@@ -99,12 +99,14 @@ function disconnectSSE() {
   }
 }
 
-const ACCOUNT_FORMS = ["tracker-form", "channel-form", "password-form", "rss-token-form", "create-user-form", "settings-form", "bind-form"];
+const MODAL_IDS = ["tracker-modal", "channel-modal", "import-modal"];
+const ACCOUNT_FORMS = ["import-form", "tracker-form", "channel-form", "password-form", "rss-token-form", "create-user-form", "settings-form", "bind-form"];
 
 // Drops everything that belongs to the signed-in account so the next user of this tab
 // cannot see it (revealed RSS URL, typed secrets, cached lists, open dialogs).
 function clearAccountState() {
-  ["tracker-modal", "channel-modal"].forEach((id) => closeModal(id));
+  MODAL_IDS.forEach((id) => closeModal(id));
+  resetImportForm();
   ACCOUNT_FORMS.forEach((id) => {
     const form = document.getElementById(id);
     if (form) form.reset();
@@ -649,11 +651,38 @@ function openTrackerModal(id = null) {
     }
   }
   updatePresetUI();
+  showModal("tracker-modal");
+}
+
+const FOCUSABLE =
+  'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+const modalOpeners = {};
+
+function modalFocusables(modal) {
+  return [...modal.querySelectorAll(FOCUSABLE)].filter((el) => el.offsetParent !== null);
+}
+
+function isModalOpen(id) {
+  return document.getElementById(id).style.display === "flex";
+}
+
+// Shows a modal, moves focus into it and remembers what to give focus back to.
+function showModal(id) {
+  const modal = document.getElementById(id);
+  if (!isModalOpen(id)) modalOpeners[id] = document.activeElement;
   modal.style.display = "flex";
+  const first = modalFocusables(modal)[0];
+  if (first) first.focus();
 }
 
 function closeModal(id) {
+  const wasOpen = isModalOpen(id);
   document.getElementById(id).style.display = "none";
+  const opener = modalOpeners[id];
+  delete modalOpeners[id];
+  if (wasOpen && opener && document.contains(opener) && typeof opener.focus === "function") {
+    opener.focus();
+  }
 }
 
 document.getElementById("tr-kind").addEventListener("change", () => {
@@ -676,6 +705,111 @@ document.getElementById("tr-cookie-file").addEventListener("change", async (e) =
 });
 
 document.getElementById("btn-add-tracker").addEventListener("click", () => openTrackerModal());
+
+// ---------------------------------------------------------------------------
+// Bulk cookie import
+// ---------------------------------------------------------------------------
+const IMPORT_MAX_FILES = 100;
+const IMPORT_MAX_FILE_BYTES = 64 * 1024;
+const IMPORT_STATUS_BADGE = { created: "ok", updated: "running", skipped: "paused", error: "error" };
+
+function importSelectedFiles() {
+  const picked = [
+    ...document.getElementById("imp-files").files,
+    ...document.getElementById("imp-folder").files,
+  ];
+  // Folders can contain anything; keep the text files.
+  return picked.filter((f) => /\.txt$/i.test(f.name));
+}
+
+function updateImportSelection() {
+  const files = importSelectedFiles();
+  const el = document.getElementById("imp-selection");
+  if (files.length === 0) el.textContent = "No .txt files selected.";
+  else if (files.length > IMPORT_MAX_FILES) el.textContent = `${files.length} files selected — at most ${IMPORT_MAX_FILES} per import.`;
+  else el.textContent = `${files.length} file(s) selected.`;
+}
+
+function resetImportForm() {
+  document.getElementById("import-form").reset();
+  document.getElementById("imp-results").innerHTML = "";
+  updateImportSelection();
+}
+
+function openImportModal() {
+  const sel = document.getElementById("imp-kind");
+  const cookiePresets = state.presets.filter((p) => p.auth !== "api_token");
+  sel.innerHTML =
+    `<option value="">Auto-detect from cookies</option>` +
+    cookiePresets.map((p) => `<option value="${esc(p.kind)}">${esc(p.label)}</option>`).join("");
+  resetImportForm();
+  showModal("import-modal");
+}
+
+function renderImportResults(results) {
+  document.getElementById("imp-results").innerHTML = results
+    .map(
+      (r) => `
+    <div class="sub-row">
+      <div>
+        <div class="sub-title"><span class="mono">${esc(r.file)}</span></div>
+        <div class="sub-meta">${esc(r.message)}</div>
+      </div>
+      <span class="badge ${IMPORT_STATUS_BADGE[r.status] || ""}">${esc(r.status)}</span>
+    </div>`
+    )
+    .join("");
+}
+
+document.getElementById("btn-import-cookies").addEventListener("click", openImportModal);
+document.getElementById("imp-files").addEventListener("change", updateImportSelection);
+document.getElementById("imp-folder").addEventListener("change", updateImportSelection);
+
+document.getElementById("import-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const files = importSelectedFiles();
+  if (files.length === 0) {
+    showToast("Choose at least one cookies .txt file");
+    return;
+  }
+  if (files.length > IMPORT_MAX_FILES) {
+    showToast(`At most ${IMPORT_MAX_FILES} files per import`);
+    return;
+  }
+  const submit = document.getElementById("imp-submit");
+  submit.disabled = true;
+  try {
+    const tooLarge = [];
+    const payloadFiles = [];
+    for (const f of files) {
+      const name = f.webkitRelativePath || f.name;
+      if (f.size > IMPORT_MAX_FILE_BYTES) tooLarge.push({ file: name, status: "error", message: "File is too large for a cookie file" });
+      else payloadFiles.push({ name, content: await f.text() });
+    }
+    let results = tooLarge;
+    if (payloadFiles.length) {
+      const res = await api("/api/trackers/import", {
+        method: "POST",
+        body: JSON.stringify({
+          kind: document.getElementById("imp-kind").value || null,
+          update_existing: document.getElementById("imp-update").checked,
+          files: payloadFiles,
+        }),
+      });
+      results = res.results.concat(tooLarge);
+    }
+    renderImportResults(results);
+    const created = results.filter((r) => r.status === "created").length;
+    const updated = results.filter((r) => r.status === "updated").length;
+    const failed = results.filter((r) => r.status === "error").length;
+    showToast(`Import: ${created} created, ${updated} updated, ${failed} failed`);
+    if (created || updated) await loadAll();
+  } catch (err) {
+    showToast(`Import failed: ${err.message}`);
+  } finally {
+    submit.disabled = false;
+  }
+});
 document.getElementById("btn-empty-add-tracker").addEventListener("click", () => openTrackerModal());
 
 document.getElementById("tracker-form").addEventListener("submit", async (e) => {
@@ -804,7 +938,7 @@ function openChannelModal(id = null) {
   } else {
     renderChannelFields(kindSel.value);
   }
-  document.getElementById("channel-modal").style.display = "flex";
+  showModal("channel-modal");
 }
 
 document.getElementById("ch-kind").addEventListener("change", (e) => renderChannelFields(e.target.value));
@@ -1092,17 +1226,37 @@ document.addEventListener("click", async (e) => {
 
 // Close modals on Escape or backdrop click
 document.addEventListener("keydown", (e) => {
+  const openId = MODAL_IDS.find(isModalOpen);
+  if (!openId) return;
   if (e.key === "Escape") {
-    closeModal("tracker-modal");
-    closeModal("channel-modal");
+    closeModal(openId);
+    return;
+  }
+  if (e.key !== "Tab") return;
+  // Keep keyboard focus inside the open dialog.
+  const modal = document.getElementById(openId);
+  const items = modalFocusables(modal);
+  if (items.length === 0) {
+    e.preventDefault();
+    return;
+  }
+  const first = items[0];
+  const last = items[items.length - 1];
+  if (!modal.contains(document.activeElement)) {
+    e.preventDefault();
+    first.focus();
+  } else if (e.shiftKey && document.activeElement === first) {
+    e.preventDefault();
+    last.focus();
+  } else if (!e.shiftKey && document.activeElement === last) {
+    e.preventDefault();
+    first.focus();
   }
 });
 
-["tracker-modal", "channel-modal"].forEach((id) => {
+MODAL_IDS.forEach((id) => {
   document.getElementById(id).addEventListener("click", (e) => {
-    if (e.target.id === id) {
-      e.target.style.display = "none";
-    }
+    if (e.target.id === id) closeModal(id);
   });
 });
 
@@ -1116,7 +1270,26 @@ document.getElementById("btn-clear-logs").addEventListener("click", () => {
   renderLogs();
 });
 
+// SSE events that arrive while a snapshot is loading would be overwritten by it, so they
+// are buffered and replayed on top of the snapshot.
+let snapshotLoads = 0;
+let bufferedEvents = [];
+
 async function loadAll() {
+  snapshotLoads += 1;
+  try {
+    await loadSnapshot();
+  } finally {
+    snapshotLoads -= 1;
+    if (snapshotLoads === 0 && bufferedEvents.length) {
+      const pending = bufferedEvents;
+      bufferedEvents = [];
+      pending.forEach((ev) => applyServerEvent(ev, true));
+    }
+  }
+}
+
+async function loadSnapshot() {
   const [presets, ov, logs] = await Promise.all([
     api("/api/trackers/presets"),
     api("/api/overview"),
@@ -1150,16 +1323,13 @@ function connectSSE() {
   const label = ind.querySelector(".sse-label");
   const es = new EventSource("/api/events");
   state.eventSource = es;
-  let openedBefore = false;
 
   es.onopen = async () => {
     ind.dataset.state = "connected";
     label.textContent = "Live";
-    if (!openedBefore) {
-      openedBefore = true;
-      return;
-    }
-    // Events emitted while disconnected are not replayed: reload the snapshot.
+    // Events emitted before this subscription (initial page load, or while disconnected)
+    // are not replayed by the server: reload the snapshot every time the stream opens.
+    // The first open follows the bootstrap load closely, but that gap can still drop events.
     try {
       await loadAll();
     } catch {}
@@ -1179,28 +1349,43 @@ function connectSSE() {
     }
   };
   es.onmessage = (msg) => {
+    let ev;
     try {
-      const ev = JSON.parse(msg.data);
-      if (ev.event === "log") {
-        state.logs.push(ev.data);
-        if (state.logs.length > 300) state.logs.shift();
-        renderLogs();
-      } else if (ev.event === "tracker_updated") {
-        const idx = state.trackers.findIndex((t) => t.id === ev.data.id);
-        if (idx >= 0) state.trackers[idx] = ev.data;
-        else state.trackers.push(ev.data);
-        renderTrackers();
-      } else if (ev.event === "new_notification") {
-        // Reconcile by ID: a snapshot reload may already contain this entry.
-        const existing = state.notifications.findIndex((n) => n.id === ev.data.id);
-        if (existing >= 0) state.notifications[existing] = ev.data;
-        else state.notifications.unshift(ev.data);
-        renderNotifications();
-        document.getElementById("stat-notifs").textContent = state.notifications.length;
-        updateNavCounts();
-      }
-    } catch {}
+      ev = JSON.parse(msg.data);
+    } catch {
+      return;
+    }
+    if (snapshotLoads > 0) bufferedEvents.push(ev);
+    else applyServerEvent(ev, false);
   };
+}
+
+function applyServerEvent(ev, replayed) {
+  try {
+    if (ev.event === "log") {
+      // A replayed log line may already be part of the reloaded snapshot.
+      if (replayed) {
+        const key = JSON.stringify(ev.data);
+        if (state.logs.slice(-50).some((l) => JSON.stringify(l) === key)) return;
+      }
+      state.logs.push(ev.data);
+      if (state.logs.length > 300) state.logs.shift();
+      renderLogs();
+    } else if (ev.event === "tracker_updated") {
+      const idx = state.trackers.findIndex((t) => t.id === ev.data.id);
+      if (idx >= 0) state.trackers[idx] = ev.data;
+      else state.trackers.push(ev.data);
+      renderTrackers();
+    } else if (ev.event === "new_notification") {
+      // Reconcile by ID: a snapshot reload may already contain this entry.
+      const existing = state.notifications.findIndex((n) => n.id === ev.data.id);
+      if (existing >= 0) state.notifications[existing] = ev.data;
+      else state.notifications.unshift(ev.data);
+      renderNotifications();
+      document.getElementById("stat-notifs").textContent = state.notifications.length;
+      updateNavCounts();
+    }
+  } catch {}
 }
 
 async function bootstrap() {

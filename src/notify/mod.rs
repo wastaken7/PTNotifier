@@ -169,7 +169,37 @@ pub fn format_markdown(raw: &str) -> String {
     });
     let s = re_html.replace_all(&s, "");
     let s = re_bb.replace_all(&s, "");
-    s.trim().to_string()
+    // Decode last, in a single pass: tags are already gone, so `&lt;b&gt;` becomes literal
+    // text instead of being stripped as markup, and `&amp;lt;` stays `&lt;`.
+    decode_html_entities(s.trim())
+}
+
+/// Single-pass decoding of HTML character references (common named ones and numeric).
+/// Unknown named entities are left untouched.
+pub fn decode_html_entities(raw: &str) -> String {
+    static RE_ENT: OnceLock<Regex> = OnceLock::new();
+    let re = RE_ENT
+        .get_or_init(|| Regex::new(r"&(#[0-9]{1,7}|#[xX][0-9a-fA-F]{1,6}|[a-zA-Z]{2,8});").unwrap());
+    re.replace_all(raw, |c: &regex::Captures| {
+        let ent = &c[1];
+        let decoded = if let Some(hex) = ent.strip_prefix("#x").or_else(|| ent.strip_prefix("#X")) {
+            u32::from_str_radix(hex, 16).ok().and_then(char::from_u32)
+        } else if let Some(dec) = ent.strip_prefix('#') {
+            dec.parse::<u32>().ok().and_then(char::from_u32)
+        } else {
+            match ent {
+                "amp" => Some('&'),
+                "lt" => Some('<'),
+                "gt" => Some('>'),
+                "quot" => Some('"'),
+                "apos" => Some('\''),
+                "nbsp" => Some(' '),
+                _ => None,
+            }
+        };
+        decoded.map_or_else(|| c[0].to_string(), String::from)
+    })
+    .into_owned()
 }
 
 /// Converts BBCode and generic HTML to Telegram-compatible HTML.
@@ -461,6 +491,14 @@ mod tests {
         let input = "[b]Alert[/b] [spoiler]secret[/spoiler]";
         let html = format_telegram_html(input);
         assert_eq!(html, "<b>Alert</b> <tg-spoiler>secret</tg-spoiler>");
+    }
+
+    #[test]
+    fn markdown_decodes_entities_in_text_and_links() {
+        let md = format_markdown(
+            r#"A &amp; B &lt;tag&gt; &amp;lt; <a href="https://e.org/?a=1&amp;b=2">x</a> &#39;q&#x27; &copy;"#,
+        );
+        assert_eq!(md, "A & B <tag> &lt; [x](https://e.org/?a=1&b=2) 'q' &copy;");
     }
 
     #[test]

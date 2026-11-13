@@ -53,7 +53,7 @@ enum Commands {
     Serve {
         /// Address to bind the WebUI & API server (default 127.0.0.1:8085, or the address
         /// saved in the WebUI). When set, the WebUI cannot change it.
-        #[arg(long, env = "PTN_BIND")]
+        #[arg(long, env = "PTN_BIND", value_parser = parse_bind_arg)]
         bind: Option<SocketAddr>,
         /// Run with a system tray icon (Windows, macOS, or Linux with `--features tray`)
         #[arg(long)]
@@ -69,7 +69,7 @@ enum Commands {
     Tray {
         /// Address to bind the WebUI & API server (default 127.0.0.1:8085, or the address
         /// saved in the WebUI). When set, the WebUI cannot change it.
-        #[arg(long, env = "PTN_BIND")]
+        #[arg(long, env = "PTN_BIND", value_parser = parse_bind_arg)]
         bind: Option<SocketAddr>,
         /// Trust X-Forwarded-For / X-Forwarded-Proto / X-Forwarded-Host headers from a reverse proxy
         #[arg(long, env = "PTN_TRUST_PROXY")]
@@ -197,6 +197,22 @@ fn read_password_arg(provided: Option<String>) -> Result<String> {
     Ok(line.trim_end_matches(&['\r', '\n'][..]).to_string())
 }
 
+/// clap value parser sharing the WebUI's validation (rejects port 0, multicast, ...).
+fn parse_bind_arg(raw: &str) -> Result<SocketAddr> {
+    bind::parse_bind(raw)
+}
+
+/// `PTN_BIND` for the default command: unset/blank means "not set", but a present value that
+/// does not parse is an error rather than silently falling back to the saved address.
+fn env_bind() -> Result<Option<SocketAddr>> {
+    match std::env::var("PTN_BIND") {
+        Ok(raw) if !raw.trim().is_empty() => bind::parse_bind(&raw)
+            .map(Some)
+            .map_err(|e| e.context("Invalid PTN_BIND")),
+        _ => Ok(None),
+    }
+}
+
 fn env_flag(name: &str) -> bool {
     std::env::var(name)
         .ok()
@@ -321,9 +337,7 @@ fn main() -> Result<()> {
         feature = "tray"
     ));
     let cmd = cli.command.unwrap_or(Commands::Serve {
-        bind: std::env::var("PTN_BIND")
-            .ok()
-            .and_then(|s| s.trim().parse().ok()),
+        bind: env_bind()?,
         tray: default_tray,
         trust_proxy: env_flag("PTN_TRUST_PROXY"),
         allow_private_networks: env_flag("PTN_ALLOW_PRIVATE_NETWORKS"),
@@ -626,4 +640,16 @@ fn main() -> Result<()> {
 async fn shutdown_signal() {
     let _ = tokio::signal::ctrl_c().await;
     info!("Shutdown signal received, stopping...");
+}
+
+#[cfg(test)]
+mod cli_tests {
+    use super::*;
+
+    #[test]
+    fn bind_flag_uses_shared_validation() {
+        assert!(Cli::try_parse_from(["ptn", "serve", "--bind", "127.0.0.1:0"]).is_err());
+        assert!(Cli::try_parse_from(["ptn", "tray", "--bind", "224.0.0.1:8085"]).is_err());
+        assert!(Cli::try_parse_from(["ptn", "serve", "--bind", "127.0.0.1:8090"]).is_ok());
+    }
 }

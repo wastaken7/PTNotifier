@@ -669,14 +669,20 @@ pub async fn fetch_torrentleech(
         if cols.len() < 4 {
             continue;
         }
-        let Some(item_id) = cols[1].value().attr("data-sort").map(str::to_string) else {
+        let Some(sort_key) = cols[1].value().attr("data-sort") else {
             continue;
         };
+        let msg_text = text_clean(cols[3]);
+        // `data-sort` is a timestamp, so several notifications can share it; add the message
+        // text so each one gets its own ID.
+        let item_id = format!(
+            "{sort_key}_{}",
+            &crate::security::sha256_hex(&msg_text)[..16]
+        );
         if ctx.is_processed(&item_id) {
             continue;
         }
         let date = text_clean(cols[1]);
-        let msg_text = text_clean(cols[3]);
         let link = cols[3]
             .select(&sel("a[href]"))
             .next()
