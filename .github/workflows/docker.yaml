@@ -4,9 +4,6 @@ on:
   release:
     types:
       - published
-  push:
-    branches:
-      - main
   workflow_dispatch:
     inputs:
       use_latest_tag:
@@ -151,8 +148,6 @@ jobs:
           echo "📝 Event: ${{ github.event_name }}"
           if [ "${{ github.event_name }}" == "release" ]; then
             echo "📝 Triggered by release: ${{ github.event.release.tag_name }}"
-          elif [ "${{ github.event_name }}" == "push" ]; then
-            echo "📝 Triggered by push to branch: ${{ github.ref_name }}"
           else
             echo "📝 Triggered by manual workflow dispatch on branch: ${{ github.ref_name }}"
           fi
