@@ -1,0 +1,197 @@
+name: Release Binaries
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag (e.g. v0.1.0)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+  BIN_NAME: ptn
+
+jobs:
+  resolve:
+    name: Resolve release source
+    runs-on: ubuntu-latest
+    outputs:
+      sha: ${{ steps.resolve.outputs.sha }}
+
+    steps:
+      - name: Resolve tag to commit
+        id: resolve
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$TAG" =~ ^[0-9A-Za-z][0-9A-Za-z._-]*$ ]]; then
+            echo "::error::Invalid release tag '$TAG'"
+            exit 1
+          fi
+          if sha=$(gh api "repos/${GITHUB_REPOSITORY}/commits/refs/tags/${TAG}" --jq .sha 2>/dev/null); then
+            echo "Tag ${TAG} already exists at ${sha}; building that commit."
+          else
+            sha="${GITHUB_SHA}"
+            echo "Tag ${TAG} does not exist yet; it will be created at ${sha}."
+          fi
+          echo "sha=${sha}" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: Build (${{ matrix.name }})
+    needs: resolve
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: windows-x86_64
+            os: windows-latest
+            target: x86_64-pc-windows-msvc
+            ext: .exe
+            archive: zip
+            apt: ''
+
+          - name: linux-x86_64
+            os: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+            ext: ''
+            archive: tar.gz
+            apt: ''
+
+          - name: linux-x86_64-musl
+            os: ubuntu-24.04
+            target: x86_64-unknown-linux-musl
+            ext: ''
+            archive: tar.gz
+            apt: musl-tools
+
+          - name: linux-aarch64
+            os: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+            ext: ''
+            archive: tar.gz
+            apt: ''
+
+          - name: linux-aarch64-musl
+            os: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-musl
+            ext: ''
+            archive: tar.gz
+            apt: musl-tools
+
+          - name: macos-aarch64
+            os: macos-latest
+            target: aarch64-apple-darwin
+            ext: ''
+            archive: tar.gz
+            apt: ''
+
+          - name: macos-x86_64
+            os: macos-latest
+            target: x86_64-apple-darwin
+            ext: ''
+            archive: tar.gz
+            apt: ''
+
+    steps:
+      - name: Checkout release source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve.outputs.sha }}
+          persist-credentials: false
+
+      - name: Resolve release version
+        id: meta
+        shell: bash
+        env:
+          TAG: ${{ inputs.tag }}
+        run: echo "version=${TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Install system dependencies
+        if: matrix.apt != ''
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ${{ matrix.apt }}
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Cache Cargo dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: release-${{ matrix.target }}
+
+      - name: Build release binary
+        run: cargo build --release --locked --target ${{ matrix.target }}
+
+      - name: Package Windows archive
+        if: matrix.archive == 'zip'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          $bin = "target/${{ matrix.target }}/release/${{ env.BIN_NAME }}${{ matrix.ext }}"
+          $archive = "dist/${{ env.BIN_NAME }}-${{ steps.meta.outputs.version }}-${{ matrix.name }}.zip"
+          Compress-Archive -Path $bin -DestinationPath $archive -Force
+
+      - name: Package Unix archive
+        if: matrix.archive == 'tar.gz'
+        shell: bash
+        run: |
+          mkdir -p dist
+          BIN_PATH="target/${{ matrix.target }}/release/${{ env.BIN_NAME }}"
+          strip "$BIN_PATH" || true
+          tar -C "target/${{ matrix.target }}/release" -czf "dist/${{ env.BIN_NAME }}-${{ steps.meta.outputs.version }}-${{ matrix.name }}.tar.gz" "${{ env.BIN_NAME }}"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.name }}
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 1
+
+  release:
+    name: Publish GitHub Release
+    needs: [resolve, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: write
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: release-*
+          merge-multiple: true
+
+      - name: Generate SHA256 checksums
+        working-directory: dist
+        run: sha256sum * > checksums.txt
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.tag }}
+          target_commitish: ${{ needs.resolve.outputs.sha }}
+          generate_release_notes: true
+          files: dist/*
+
+      # Releases created with GITHUB_TOKEN do not trigger `release: published` workflows,
+      # so start the Docker publication explicitly, on the release tag.
+      - name: Trigger Docker image publication
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+        run: gh workflow run docker.yaml --repo "$GITHUB_REPOSITORY" --ref "$TAG" -f use_latest_tag=true

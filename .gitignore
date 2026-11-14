@@ -1,8 +1,39 @@
-__pycache__/
+# Rust / Cargo
+/target/
+**/*.rs.bk
+*.pdb
+
+# Environment & Secrets
+.env
+.env.*
+!.env.example
+.ptn_master.key
+ptnotifier.env
+
+# Legacy Python version (may still exist in upgraded checkouts and hold credentials)
+config.py
 cookies/
 state/
 debug/
-config.py
-.vscode/
+__pycache__/
 .venv/
-.ruff_cache/
+
+# Database & Runtime State
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Editors / IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~

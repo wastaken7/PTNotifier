@@ -1,8 +1,13 @@
-FROM python:3.14-alpine
-
+FROM rust:1.89-bookworm AS builder
 WORKDIR /app
-COPY ./requirements.txt /app/requirements.txt
-RUN pip3 install --no-cache-dir -r requirements.txt
-COPY . /app/
+COPY Cargo.toml Cargo.lock* ./
+COPY src ./src
+RUN cargo build --release
 
-ENTRYPOINT ["python3", "ptn.py"]
+FROM debian:bookworm-slim
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
+WORKDIR /data
+COPY --from=builder /app/target/release/ptn /usr/local/bin/ptn
+EXPOSE 8085
+ENTRYPOINT ["ptn"]
+CMD ["serve", "--db", "/data/ptnotifier.db", "--bind", "0.0.0.0:8085"]

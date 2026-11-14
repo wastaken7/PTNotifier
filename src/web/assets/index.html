@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="light dark" />
+  <title>PTNotifier</title>
+  <link rel="icon" type="image/svg+xml" href="/assets/icon.svg" />
+  <link rel="icon" type="image/png" href="/assets/icon.png" />
+  <link rel="alternate" type="application/rss+xml" title="PTNotifier RSS" href="/rss" />
+  <link rel="stylesheet" href="/assets/style.css" />
+</head>
+
+<body>
+  <!-- ================================================================== -->
+  <!-- Sign-in / first-run setup                                           -->
+  <!-- ================================================================== -->
+  <div class="auth" id="auth" hidden>
+    <div class="auth-card">
+      <div class="auth-brand">
+        <img src="/assets/icon.svg" alt="" width="40" height="40" />
+        <div>
+          <h1 class="auth-title">PTNotifier</h1>
+          <p class="auth-sub" id="auth-sub">Sign in to continue</p>
+        </div>
+      </div>
+
+      <div class="alert error" id="auth-error" role="alert" hidden></div>
+
+      <form id="setup-form" class="stack" hidden>
+        <label class="field">
+          <span class="label">Administrator username</span>
+          <input type="text" class="input" name="username" value="admin" autocomplete="username" minlength="3" maxlength="64" required />
+        </label>
+        <label class="field">
+          <span class="label">Password</span>
+          <input type="password" class="input" name="password" autocomplete="new-password" minlength="10" maxlength="128" required />
+          <span class="help">At least 10 characters.</span>
+        </label>
+        <label class="field">
+          <span class="label">Confirm password</span>
+          <input type="password" class="input" name="confirm" autocomplete="new-password" minlength="10" maxlength="128" required />
+        </label>
+        <label class="field" id="setup-token-field" hidden>
+          <span class="label">Setup token</span>
+          <input type="text" class="input mono" name="setup_token" autocomplete="off" spellcheck="false" />
+          <span class="help">Printed in the server log when PTNotifier started.</span>
+        </label>
+        <button type="submit" class="btn primary block">Create administrator</button>
+      </form>
+
+      <form id="login-form" class="stack" hidden>
+        <label class="field">
+          <span class="label">Username</span>
+          <input type="text" class="input" name="username" autocomplete="username" required />
+        </label>
+        <label class="field">
+          <span class="label">Password</span>
+          <input type="password" class="input" name="password" autocomplete="current-password" required />
+        </label>
+        <button type="submit" class="btn primary block">Sign in</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ================================================================== -->
+  <!-- Application                                                         -->
+  <!-- ================================================================== -->
+  <div class="shell" id="shell" hidden>
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-head">
+        <a class="brand" href="#/trackers">
+          <img src="/assets/icon.svg" alt="" width="28" height="28" />
+          <span>PTNotifier</span>
+        </a>
+        <span class="live" id="live" data-state="connecting" title="Live updates">
+          <span class="live-dot"></span><span class="live-label">Connecting</span>
+        </span>
+      </div>
+
+      <nav class="nav" aria-label="Main">
+        <a class="nav-link" href="#/trackers" data-view="trackers">
+          <span data-icon="radar"></span><span>Trackers</span>
+          <span class="nav-badge warn" id="nav-attention" hidden></span>
+        </a>
+        <a class="nav-link" href="#/notifications" data-view="notifications">
+          <span data-icon="bell"></span><span>Notifications</span>
+          <span class="nav-badge" id="nav-unseen" hidden></span>
+        </a>
+        <a class="nav-link" href="#/channels" data-view="channels">
+          <span data-icon="send"></span><span>Channels</span>
+        </a>
+        <a class="nav-link" href="#/logs" data-view="logs">
+          <span data-icon="terminal"></span><span>Logs</span>
+        </a>
+        <a class="nav-link" href="#/settings" data-view="settings">
+          <span data-icon="sliders"></span><span>Settings</span>
+        </a>
+        <a class="nav-link" href="#/account" data-view="account">
+          <span data-icon="shield"></span><span>Account &amp; security</span>
+        </a>
+      </nav>
+
+      <div class="sidebar-foot">
+        <div class="whoami">
+          <span class="avatar" id="me-avatar" aria-hidden="true"></span>
+          <span class="whoami-text">
+            <span class="whoami-name" id="me-name"></span>
+            <span class="whoami-role" id="me-role"></span>
+          </span>
+        </div>
+        <div class="foot-actions">
+          <button type="button" class="icon-btn" id="btn-theme" title="Theme: system" aria-label="Change theme"><span data-icon="monitor"></span></button>
+          <button type="button" class="icon-btn" id="btn-logout" title="Sign out" aria-label="Sign out"><span data-icon="logout"></span></button>
+        </div>
+      </div>
+    </aside>
+
+    <header class="mobilebar">
+      <button type="button" class="icon-btn" id="btn-menu" aria-label="Open menu" aria-controls="sidebar" aria-expanded="false"><span data-icon="menu"></span></button>
+      <a class="brand" href="#/trackers">
+        <img src="/assets/icon.svg" alt="" width="24" height="24" />
+        <span>PTNotifier</span>
+      </a>
+      <span class="live compact" id="live-mobile" data-state="connecting"><span class="live-dot"></span></span>
+    </header>
+    <div class="scrim" id="scrim" hidden></div>
+
+    <main class="main" id="main" tabindex="-1">
+      <!-- ============================ TRACKERS ============================ -->
+      <section class="view" data-view="trackers" hidden>
+        <header class="view-head">
+          <div>
+            <h1>Trackers</h1>
+            <p class="lead">Sites being watched for notifications and private messages.</p>
+          </div>
+          <div class="view-actions admin-only">
+            <button type="button" class="btn" id="btn-import"><span data-icon="upload"></span>Import cookies</button>
+            <button type="button" class="btn primary" id="btn-add-tracker"><span data-icon="plus"></span>Add tracker</button>
+          </div>
+        </header>
+
+        <div class="stats" id="tracker-stats" role="group" aria-label="Filter by status">
+          <button type="button" class="stat" data-filter="">
+            <span class="stat-label">All trackers</span><span class="stat-value" id="stat-all">0</span>
+          </button>
+          <button type="button" class="stat ok" data-filter="ok">
+            <span class="stat-label">Healthy</span><span class="stat-value" id="stat-ok">0</span>
+          </button>
+          <button type="button" class="stat err" data-filter="attention">
+            <span class="stat-label">Need attention</span><span class="stat-value" id="stat-attention">0</span>
+          </button>
+          <button type="button" class="stat muted" data-filter="paused">
+            <span class="stat-label">Paused</span><span class="stat-value" id="stat-paused">0</span>
+          </button>
+        </div>
+
+        <div class="toolbar">
+          <label class="search">
+            <span data-icon="search"></span>
+            <input type="search" class="input" id="tracker-search" placeholder="Search trackers" aria-label="Search trackers" />
+            <kbd aria-hidden="true" title="Press / to search">/</kbd>
+          </label>
+        </div>
+
+        <div class="card flush">
+          <div class="tracker-list" id="tracker-list" role="list"></div>
+          <div class="empty" id="trackers-empty" hidden>
+            <span class="empty-icon" data-icon="radar"></span>
+            <p class="empty-title">No trackers yet</p>
+            <p class="empty-text">Add a tracker by hand, or import a folder of <span class="mono">cookies.txt</span> files exported from your browser.</p>
+            <div class="row center admin-only">
+              <button type="button" class="btn" data-open="import"><span data-icon="upload"></span>Import cookies</button>
+              <button type="button" class="btn primary" data-open="tracker"><span data-icon="plus"></span>Add tracker</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========================= NOTIFICATIONS ========================== -->
+      <section class="view" data-view="notifications" hidden>
+        <header class="view-head">
+          <div>
+            <h1>Notifications</h1>
+            <p class="lead">Everything captured from your trackers, newest first.</p>
+          </div>
+          <div class="view-actions">
+            <a class="btn" id="rss-link" href="/rss" target="_blank" rel="noreferrer"><span data-icon="rss"></span>RSS</a>
+            <button type="button" class="btn" id="btn-refresh-notifs"><span data-icon="refresh"></span>Refresh</button>
+          </div>
+        </header>
+
+        <div class="toolbar wrap">
+          <div class="segmented" role="radiogroup" aria-label="Type" id="notif-type">
+            <button type="button" role="radio" data-value="" aria-checked="true">All</button>
+            <button type="button" role="radio" data-value="notification" aria-checked="false">Notifications</button>
+            <button type="button" role="radio" data-value="message" aria-checked="false">Messages</button>
+            <button type="button" role="radio" data-value="error" aria-checked="false">Errors</button>
+          </div>
+          <select class="input auto" id="notif-tracker" aria-label="Tracker">
+            <option value="">All trackers</option>
+          </select>
+          <label class="search grow">
+            <span data-icon="search"></span>
+            <input type="search" class="input" id="notif-search" placeholder="Search text" aria-label="Search notifications" />
+          </label>
+        </div>
+
+        <div id="notif-feed" class="feed" aria-live="polite"></div>
+      </section>
+
+      <!-- ============================ CHANNELS ============================ -->
+      <section class="view" data-view="channels" hidden>
+        <header class="view-head">
+          <div>
+            <h1>Channels</h1>
+            <p class="lead">Where alerts are delivered. Each channel chooses which kinds of alerts it receives.</p>
+          </div>
+          <div class="view-actions admin-only">
+            <button type="button" class="btn primary" data-open="channel"><span data-icon="plus"></span>Add channel</button>
+          </div>
+        </header>
+        <div id="channel-grid" class="channel-grid"></div>
+      </section>
+
+      <!-- ============================== LOGS ============================== -->
+      <section class="view" data-view="logs" hidden>
+        <header class="view-head">
+          <div>
+            <h1>Logs</h1>
+            <p class="lead">Live output from the background checker.</p>
+          </div>
+        </header>
+
+        <div class="toolbar wrap">
+          <div class="segmented" role="radiogroup" aria-label="Minimum level" id="log-level">
+            <button type="button" role="radio" data-value="DEBUG" aria-checked="false">All</button>
+            <button type="button" role="radio" data-value="INFO" aria-checked="true">Info</button>
+            <button type="button" role="radio" data-value="WARN" aria-checked="false">Warnings</button>
+            <button type="button" role="radio" data-value="ERROR" aria-checked="false">Errors</button>
+          </div>
+          <label class="search grow">
+            <span data-icon="search"></span>
+            <input type="search" class="input" id="log-search" placeholder="Filter lines" aria-label="Filter log lines" />
+          </label>
+          <button type="button" class="btn" id="btn-log-follow" aria-pressed="true"><span data-icon="pause"></span><span>Pause</span></button>
+          <button type="button" class="btn" id="btn-log-clear"><span data-icon="trash"></span>Clear</button>
+        </div>
+
+        <div class="logs" id="log-box" role="log" aria-live="off" tabindex="0"></div>
+        <div class="log-foot">
+          <span id="log-count"></span>
+          <button type="button" class="link-btn" id="btn-log-jump" hidden>Jump to latest ↓</button>
+        </div>
+      </section>
+
+      <!-- ============================ SETTINGS ============================ -->
+      <section class="view" data-view="settings" hidden>
+        <header class="view-head">
+          <div>
+            <h1>Settings</h1>
+            <p class="lead">Defaults that apply to every tracker unless the tracker overrides them.</p>
+          </div>
+        </header>
+
+        <form class="card section" id="settings-form">
+          <fieldset class="fieldset" id="settings-fields">
+            <div class="section-head">
+              <h2>Checking</h2>
+              <p class="read-only-note" hidden>Only administrators can change settings.</p>
+            </div>
+            <div class="grid-2">
+              <label class="field">
+                <span class="label">Check every</span>
+                <span class="input-unit"><input type="number" class="input mono" name="default_check_interval_secs" min="60" step="1" required /><span>seconds</span></span>
+                <span class="help" data-humanize="default_check_interval_secs">Minimum 60.</span>
+              </label>
+              <label class="field">
+                <span class="label">Pause between requests</span>
+                <span class="input-unit"><input type="number" class="input mono" name="request_delay_secs" min="0" max="300" step="0.5" required /><span>seconds</span></span>
+                <span class="help">Spacing between consecutive requests to trackers, 0 to 300.</span>
+              </label>
+              <label class="field">
+                <span class="label">Request timeout</span>
+                <span class="input-unit"><input type="number" class="input mono" name="http_timeout_secs" min="5" max="300" step="1" required /><span>seconds</span></span>
+                <span class="help">5 to 300.</span>
+              </label>
+              <label class="field">
+                <span class="label">Discord message length</span>
+                <span class="input-unit"><input type="number" class="input mono" name="discord_embed_limit" min="256" max="4096" step="1" required /><span>characters</span></span>
+                <span class="help">Longer messages are cut off. 256 to 4096.</span>
+              </label>
+            </div>
+
+            <div class="divider"></div>
+            <h2>Behavior</h2>
+            <div class="stack tight">
+              <label class="switch">
+                <input type="checkbox" name="mark_as_read" />
+                <span class="switch-track" aria-hidden="true"></span>
+                <span><strong>Mark as read on the tracker</strong><span class="help block">After an item is delivered, mark it read on trackers that support it.</span></span>
+              </label>
+              <label class="switch">
+                <input type="checkbox" name="send_error_notifications" />
+                <span class="switch-track" aria-hidden="true"></span>
+                <span><strong>Send error alerts</strong><span class="help block">Alert channels with “Errors” enabled when a check fails or cookies expire.</span></span>
+              </label>
+            </div>
+          </fieldset>
+          <div class="form-foot admin-only">
+            <span class="dirty-note" id="settings-dirty" hidden>Unsaved changes</span>
+            <button type="button" class="btn" id="btn-settings-reset" disabled>Discard</button>
+            <button type="submit" class="btn primary" id="btn-settings-save" disabled>Save settings</button>
+          </div>
+        </form>
+
+        <form class="card section admin-only" id="bind-form" novalidate>
+          <div class="section-head">
+            <h2>Network access</h2>
+            <p class="lead-sm">The address this page is served on. Changes apply the next time PTNotifier starts.</p>
+          </div>
+          <div class="kv" id="bind-status"></div>
+          <div class="alert info" id="bind-locked" hidden>
+            The address is set with <code>--bind</code> or <code>PTN_BIND</code> and can’t be changed here.
+          </div>
+          <div id="bind-edit">
+            <div class="grid-2">
+              <label class="field">
+                <span class="label">Listen address</span>
+                <input type="text" class="input mono" name="bind" placeholder="127.0.0.1:8085" maxlength="64" spellcheck="false" autocomplete="off" />
+                <span class="row gap-sm">
+                  <button type="button" class="chip" data-bind-preset="127.0.0.1">This computer only</button>
+                  <button type="button" class="chip" data-bind-preset="0.0.0.0">Any device on the network</button>
+                </span>
+              </label>
+              <label class="field">
+                <span class="label">Your password</span>
+                <input type="password" class="input" name="password" autocomplete="current-password" />
+                <span class="help">Required because this changes who can reach PTNotifier.</span>
+              </label>
+            </div>
+            <div class="alert warn" id="bind-warning" hidden>
+              <span data-icon="alert"></span>
+              <div>
+                <strong>Other devices will be able to reach this page.</strong>
+                Without HTTPS, your password and session travel unencrypted, so only do this on a network you trust.
+                To reach PTNotifier over the internet, put it behind an HTTPS reverse proxy and start it with
+                <code>--trust-proxy</code> rather than forwarding the port on your router.
+                Windows may ask you to allow PTNotifier through the firewall.
+              </div>
+            </div>
+          </div>
+          <div class="form-foot" id="bind-foot">
+            <button type="button" class="btn" id="btn-bind-reset">Reset to default</button>
+            <button type="submit" class="btn primary">Save address</button>
+          </div>
+        </form>
+      </section>
+
+      <!-- ============================ ACCOUNT ============================= -->
+      <section class="view" data-view="account" hidden>
+        <header class="view-head">
+          <div>
+            <h1>Account &amp; security</h1>
+            <p class="lead">Your password, signed-in devices, feed tokens and user accounts.</p>
+          </div>
+        </header>
+
+        <form class="card section" id="password-form">
+          <h2>Change password</h2>
+          <div class="grid-3">
+            <label class="field">
+              <span class="label">Current password</span>
+              <input type="password" class="input" name="current_password" autocomplete="current-password" required />
+            </label>
+            <label class="field">
+              <span class="label">New password</span>
+              <input type="password" class="input" name="new_password" autocomplete="new-password" minlength="10" maxlength="128" required />
+              <span class="help">At least 10 characters.</span>
+            </label>
+            <label class="field">
+              <span class="label">Confirm new password</span>
+              <input type="password" class="input" name="confirm" autocomplete="new-password" minlength="10" maxlength="128" required />
+            </label>
+          </div>
+          <div class="form-foot">
+            <span class="help">Other devices will be signed out.</span>
+            <button type="submit" class="btn primary">Update password</button>
+          </div>
+        </form>
+
+        <div class="card section">
+          <div class="section-head row between">
+            <h2>Signed-in devices</h2>
+            <button type="button" class="btn sm" id="btn-revoke-others">Sign out all others</button>
+          </div>
+          <div class="rows" id="session-list"></div>
+        </div>
+
+        <div class="card section">
+          <div class="section-head">
+            <h2>RSS feed tokens</h2>
+            <p class="lead-sm">Feed readers can’t sign in, so give each one its own token. Revoke a token to cut that reader off.</p>
+          </div>
+          <form class="row gap-sm" id="rss-form">
+            <input type="text" class="input grow" name="label" placeholder="Name, e.g. FreshRSS" maxlength="64" aria-label="Token name" />
+            <button type="submit" class="btn primary">Create token</button>
+          </form>
+          <div class="alert ok" id="rss-reveal" hidden>
+            <span data-icon="check"></span>
+            <div class="grow">
+              <strong>Copy this feed address now.</strong> It won’t be shown again.
+              <div class="copy-row">
+                <code id="rss-url" class="mono"></code>
+                <button type="button" class="btn sm" id="btn-copy-rss"><span data-icon="copy"></span>Copy</button>
+              </div>
+            </div>
+          </div>
+          <div class="rows" id="rss-list"></div>
+        </div>
+
+        <div class="card section admin-only">
+          <div class="section-head">
+            <h2>Users</h2>
+            <p class="lead-sm">Viewers can see everything but can’t change trackers, channels or settings.</p>
+          </div>
+          <form class="row gap-sm wrap" id="user-form">
+            <input type="text" class="input grow" name="username" placeholder="Username" minlength="3" maxlength="64" required aria-label="Username" autocomplete="off" />
+            <input type="password" class="input grow" name="password" placeholder="Password (10+ characters)" minlength="10" maxlength="128" required aria-label="Password" autocomplete="new-password" />
+            <select class="input auto" name="role" aria-label="Role">
+              <option value="user">Viewer</option>
+              <option value="admin">Administrator</option>
+            </select>
+            <button type="submit" class="btn primary">Add user</button>
+          </form>
+          <div class="rows" id="user-list"></div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- ================================================================== -->
+  <!-- Dialogs                                                             -->
+  <!-- ================================================================== -->
+  <dialog class="dialog" id="tracker-dialog" aria-labelledby="tracker-dialog-title">
+    <form method="dialog" id="tracker-form" class="dialog-body">
+      <header class="dialog-head">
+        <h2 id="tracker-dialog-title">Add tracker</h2>
+        <button type="button" class="icon-btn" data-close aria-label="Close"><span data-icon="x"></span></button>
+      </header>
+      <div class="dialog-content stack">
+        <input type="hidden" name="id" />
+        <div class="grid-2">
+          <label class="field">
+            <span class="label">Site</span>
+            <select class="input" name="kind" required></select>
+          </label>
+          <label class="field">
+            <span class="label">Name</span>
+            <input type="text" class="input" name="name" maxlength="100" required placeholder="Shown in alerts" />
+          </label>
+        </div>
+        <label class="field">
+          <span class="label">Address</span>
+          <input type="url" class="input mono" name="base_url" required placeholder="https://" spellcheck="false" />
+        </label>
+        <div class="alert info" id="tr-notes" hidden></div>
+
+        <div class="field" id="tr-cookies-field">
+          <div class="row between">
+            <span class="label" id="tr-cookies-label">Cookies</span>
+            <label class="link-btn file-btn">Load file…<input type="file" id="tr-cookie-file" accept=".txt,text/plain" /></label>
+          </div>
+          <textarea class="input mono" name="cookies_raw" rows="4" spellcheck="false" aria-labelledby="tr-cookies-label"
+            placeholder="Paste a Netscape cookies.txt export, or a header like  uid=123; pass=abc"></textarea>
+          <label class="check" id="tr-clear-cookies" hidden><input type="checkbox" name="clear_cookies" /> Remove the saved cookies</label>
+        </div>
+
+        <div class="field" id="tr-token-field">
+          <span class="label">API key</span>
+          <input type="password" class="input mono" name="api_token" autocomplete="off" spellcheck="false" />
+          <label class="check" id="tr-clear-token" hidden><input type="checkbox" name="clear_api_token" /> Remove the saved API key</label>
+        </div>
+
+        <details class="disclosure">
+          <summary>Advanced</summary>
+          <div class="stack">
+            <div class="grid-2">
+              <label class="field">
+                <span class="label">Check every</span>
+                <span class="input-unit"><input type="number" class="input mono" name="check_interval_secs" min="60" step="1" placeholder="Default" /><span>seconds</span></span>
+                <span class="help" id="tr-interval-help">Leave empty to use the global setting.</span>
+              </label>
+              <label class="field">
+                <span class="label">Mark as read</span>
+                <select class="input" name="mark_as_read">
+                  <option value="">Use global setting</option>
+                  <option value="true">Yes</option>
+                  <option value="false">No</option>
+                </select>
+              </label>
+            </div>
+            <label class="field">
+              <span class="label">Ignore items matching</span>
+              <textarea class="input mono" name="ignore_patterns" rows="3" spellcheck="false" placeholder="torrent deleted&#10;/class (changed|promoted)/"></textarea>
+              <span class="help">One per line, case-insensitive. Plain text matches anywhere; wrap in <code>/…/</code> for a regular expression.</span>
+            </label>
+          </div>
+        </details>
+
+        <label class="switch">
+          <input type="checkbox" name="enabled" checked />
+          <span class="switch-track" aria-hidden="true"></span>
+          <span>Check this tracker on schedule</span>
+        </label>
+      </div>
+      <footer class="dialog-foot">
+        <button type="button" class="btn" data-close>Cancel</button>
+        <button type="submit" class="btn primary" value="save">Save tracker</button>
+      </footer>
+    </form>
+  </dialog>
+
+  <dialog class="dialog" id="import-dialog" aria-labelledby="import-dialog-title">
+    <form method="dialog" id="import-form" class="dialog-body">
+      <header class="dialog-head">
+        <h2 id="import-dialog-title">Import cookies</h2>
+        <button type="button" class="icon-btn" data-close aria-label="Close"><span data-icon="x"></span></button>
+      </header>
+      <div class="dialog-content stack">
+        <p class="lead-sm">
+          Each <span class="mono">cookies.txt</span> file (Netscape format) becomes one tracker, matched by the cookies’ domain.
+          Known sites are recognised automatically. For generic UNIT3D or NexusPHP sites, pick the engine below.
+        </p>
+        <div class="dropzone" id="drop">
+          <span data-icon="upload"></span>
+          <p><strong>Drop cookie files or a folder here</strong></p>
+          <p class="row center gap-sm">
+            <label class="btn sm file-btn">Choose files<input type="file" id="imp-files" accept=".txt,text/plain" multiple /></label>
+            <label class="btn sm file-btn">Choose folder<input type="file" id="imp-folder" webkitdirectory multiple /></label>
+          </p>
+          <p class="help" id="imp-selection">No files selected.</p>
+        </div>
+        <label class="field">
+          <span class="label">Engine for unrecognised sites</span>
+          <select class="input" name="kind" id="imp-kind"></select>
+        </label>
+        <label class="switch">
+          <input type="checkbox" name="update_existing" checked />
+          <span class="switch-track" aria-hidden="true"></span>
+          <span>Replace cookies of trackers that already exist</span>
+        </label>
+        <div class="rows compact" id="imp-results" aria-live="polite"></div>
+      </div>
+      <footer class="dialog-foot">
+        <button type="button" class="btn" data-close>Close</button>
+        <button type="submit" class="btn primary" id="imp-submit" value="import">Import</button>
+      </footer>
+    </form>
+  </dialog>
+
+  <dialog class="dialog" id="channel-dialog" aria-labelledby="channel-dialog-title">
+    <form method="dialog" id="channel-form" class="dialog-body">
+      <header class="dialog-head">
+        <h2 id="channel-dialog-title">Add channel</h2>
+        <button type="button" class="icon-btn" data-close aria-label="Close"><span data-icon="x"></span></button>
+      </header>
+      <div class="dialog-content stack">
+        <input type="hidden" name="id" />
+        <fieldset class="provider-pick" id="ch-kind">
+          <legend class="label">Service</legend>
+          <label><input type="radio" name="kind" value="discord" checked /><span>Discord</span></label>
+          <label><input type="radio" name="kind" value="telegram" /><span>Telegram</span></label>
+          <label><input type="radio" name="kind" value="gotify" /><span>Gotify</span></label>
+          <label><input type="radio" name="kind" value="ntfy" /><span>ntfy</span></label>
+        </fieldset>
+        <label class="field">
+          <span class="label">Name</span>
+          <input type="text" class="input" name="name" required maxlength="100" placeholder="e.g. My phone" />
+        </label>
+        <div class="grid-2" id="ch-fields"></div>
+        <fieldset class="fieldset">
+          <legend class="label">Send</legend>
+          <div class="row wrap gap-md">
+            <label class="check"><input type="checkbox" name="notify_notifications" checked /> Notifications</label>
+            <label class="check"><input type="checkbox" name="notify_pms" checked /> Private messages</label>
+            <label class="check"><input type="checkbox" name="notify_errors" /> Errors &amp; expired cookies</label>
+          </div>
+        </fieldset>
+        <label class="switch">
+          <input type="checkbox" name="enabled" checked />
+          <span class="switch-track" aria-hidden="true"></span>
+          <span>Channel enabled</span>
+        </label>
+      </div>
+      <footer class="dialog-foot">
+        <button type="button" class="btn" data-close>Cancel</button>
+        <button type="submit" class="btn primary" value="save">Save channel</button>
+      </footer>
+    </form>
+  </dialog>
+
+  <dialog class="dialog small" id="confirm-dialog" aria-labelledby="confirm-title" aria-describedby="confirm-text">
+    <form method="dialog" class="dialog-body">
+      <div class="dialog-content">
+        <h2 id="confirm-title"></h2>
+        <p id="confirm-text" class="lead-sm"></p>
+      </div>
+      <footer class="dialog-foot">
+        <button type="submit" class="btn" value="cancel" id="confirm-cancel">Cancel</button>
+        <button type="submit" class="btn danger" value="ok" id="confirm-ok">Delete</button>
+      </footer>
+    </form>
+  </dialog>
+
+  <div class="toasts" id="toasts" role="status" aria-live="polite"></div>
+  <script src="/assets/app.js"></script>
+</body>
+</html>
