@@ -374,11 +374,22 @@ impl Database {
         if let Some(name) = req.name {
             current.name = name.trim().to_string();
         }
+        // Pointing the tracker at another site (or engine) makes its saved state meaningless:
+        // processed IDs from the old site would let everything on the new one through
+        // unseeded, and cached URLs would keep hitting the old host.
+        let mut reset_state = false;
         if let Some(kind) = req.kind {
-            current.kind = kind.trim().to_string();
+            let kind = kind.trim().to_string();
+            reset_state |= kind != current.kind;
+            current.kind = kind;
         }
         if let Some(base_url) = req.base_url {
-            current.base_url = base_url.trim().to_string();
+            let base_url = base_url.trim().to_string();
+            reset_state |= base_url != current.base_url;
+            current.base_url = base_url;
+        }
+        if reset_state {
+            current.state = TrackerState::default();
         }
         if let Some(enabled) = req.enabled {
             current.enabled = enabled;
@@ -436,6 +447,13 @@ impl Database {
                 id,
             ],
         )?;
+        // Written only on reset, so an ordinary edit can't overwrite state a running check saved.
+        if reset_state {
+            conn.execute(
+                "UPDATE trackers SET state_json = ?1 WHERE id = ?2",
+                params![serde_json::to_string(&current.state)?, id],
+            )?;
+        }
         drop(conn);
         self.get_tracker(id)
     }
@@ -1202,6 +1220,65 @@ mod tests {
         let hist = db.list_notification_history(None, None, 10).unwrap();
         assert_eq!(hist.len(), 1);
         assert!(hist[0].is_staff);
+    }
+
+    #[test]
+    fn changing_site_resets_tracker_state_but_other_edits_keep_it() {
+        let db = Database::open_in_memory().unwrap();
+        let t = db
+            .create_tracker(
+                CreateTrackerRequest {
+                    name: "T".into(),
+                    kind: "unit3d".into(),
+                    base_url: None,
+                    enabled: true,
+                    check_interval_secs: None,
+                    mark_as_read: None,
+                    cookies_raw: String::new(),
+                    api_token: String::new(),
+                    ignore_patterns: vec![],
+                },
+                "https://one.example".into(),
+            )
+            .unwrap();
+        let seeded = TrackerState {
+            processed_ids: vec!["msg_1".into()],
+            notifications_url: Some("https://one.example/notifications".into()),
+            initialized: true,
+            ..Default::default()
+        };
+        db.update_tracker_runtime(&t.id, TrackerStatus::Ok, None, None, None, &seeded)
+            .unwrap();
+
+        let edit = |name: Option<&str>, base_url: Option<&str>| UpdateTrackerRequest {
+            name: name.map(Into::into),
+            kind: None,
+            base_url: base_url.map(Into::into),
+            enabled: None,
+            check_interval_secs: None,
+            mark_as_read: None,
+            cookies_raw: None,
+            api_token: None,
+            clear_cookies: false,
+            clear_api_token: false,
+            ignore_patterns: None,
+        };
+
+        // Renaming, or "changing" the URL to the same value, keeps the state.
+        let same = db
+            .update_tracker(&t.id, edit(Some("Renamed"), Some(" https://one.example ")))
+            .unwrap()
+            .unwrap();
+        assert!(same.state.initialized);
+        assert_eq!(same.state.processed_ids, vec!["msg_1".to_string()]);
+
+        let moved = db
+            .update_tracker(&t.id, edit(None, Some("https://two.example")))
+            .unwrap()
+            .unwrap();
+        assert!(!moved.state.initialized);
+        assert!(moved.state.processed_ids.is_empty());
+        assert!(moved.state.notifications_url.is_none());
     }
 
     #[test]

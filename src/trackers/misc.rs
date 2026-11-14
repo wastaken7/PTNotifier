@@ -1,5 +1,7 @@
 use crate::models::{ItemType, NotificationItem};
-use crate::trackers::{DEFAULT_USER_AGENT, TrackerContext, TrackerError, sel, text_clean};
+use crate::trackers::{
+    DEFAULT_USER_AGENT, TrackerContext, TrackerError, net_error, sel, text_clean,
+};
 use regex::Regex;
 use scraper::Html;
 use serde_json::Value;
@@ -158,7 +160,7 @@ pub async fn fetch_digitalcore(
         .header("Accept", "application/json, text/plain, */*")
         .send()
         .await
-        .map_err(|e| TrackerError::Network(format!("DigitalCore API: {e}")))?;
+        .map_err(|e| net_error("DigitalCore API", e))?;
 
     let status = resp.status();
     if !status.is_success() {
@@ -167,7 +169,7 @@ pub async fn fetch_digitalcore(
     let data: Vec<Value> = resp
         .json()
         .await
-        .map_err(|e| TrackerError::Parse(format!("DigitalCore JSON: {e}")))?;
+        .map_err(|e| TrackerError::Parse(format!("DigitalCore JSON: {}", e.without_url())))?;
 
     let mut items = Vec::new();
     for msg in data {

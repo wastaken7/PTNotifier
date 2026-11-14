@@ -145,17 +145,24 @@ fn plan_file(kind: Option<&str>, content: &str, existing: &[TrackerConfig]) -> R
             {
                 return Err(format!("Cookies are for {domain}, not {host}"));
             }
-            // Generic types accept any domain; don't turn a site that has its own preset
-            // (e.g. BJ-Share in a folder imported as UNIT3D) into a mis-typed tracker.
-            if let Some(own) = detect_preset(domain)
-                && own.kind != preset.kind
-            {
-                return Err(format!(
-                    "{domain} is {}, not {}; import it with Auto-detect",
-                    own.label, preset.label
-                ));
+            match detect_preset(domain) {
+                // A generic engine is only the fallback for unrecognised sites: a site with
+                // its own preset (e.g. BJ-Share in a folder imported as UNIT3D) keeps it, so
+                // one mixed folder can be imported in a single pass.
+                Some(own) if own.kind != preset.kind && preset.custom_base_url => {
+                    if !accepts_cookies(own) {
+                        return Err(format!("{} does not use cookies", own.label));
+                    }
+                    own
+                }
+                Some(own) if own.kind != preset.kind => {
+                    return Err(format!(
+                        "{domain} is {}, not {}; import it with Auto-detect",
+                        own.label, preset.label
+                    ));
+                }
+                _ => preset,
             }
-            preset
         }
         None => detect_preset(domain).ok_or_else(|| {
             format!("Could not detect the tracker type for {domain}; choose a type (e.g. UNIT3D) and import again")
@@ -169,10 +176,33 @@ fn plan_file(kind: Option<&str>, content: &str, existing: &[TrackerConfig]) -> R
     };
 
     let base_host = host_of(&base_url).unwrap_or_else(|| domain.clone());
-    if let Some(t) = existing.iter().find(|t| {
-        t.kind.eq_ignore_ascii_case(preset.kind)
-            && host_of(&t.base_url).is_some_and(|h| same_site(&h, &base_host))
-    }) {
+    let same_kind = |t: &&TrackerConfig| t.kind.eq_ignore_ascii_case(preset.kind);
+    // Prefer the tracker on exactly this host; fall back to a related host (www., parent
+    // domain) only when that match is unambiguous, so example.net and pt.example.net
+    // never get each other's cookies.
+    let exact = existing
+        .iter()
+        .filter(same_kind)
+        .find(|t| host_of(&t.base_url).is_some_and(|h| h == base_host));
+    let target = match exact {
+        Some(t) => Some(t),
+        None => {
+            let related: Vec<&TrackerConfig> = existing
+                .iter()
+                .filter(same_kind)
+                .filter(|t| host_of(&t.base_url).is_some_and(|h| same_site(&h, &base_host)))
+                .collect();
+            if related.len() > 1 {
+                let names: Vec<&str> = related.iter().map(|t| t.name.as_str()).collect();
+                return Err(format!(
+                    "Cookies for {base_host} could belong to several trackers ({}); update it with \"Edit\" instead",
+                    names.join(", ")
+                ));
+            }
+            related.into_iter().next()
+        }
+    };
+    if let Some(t) = target {
         return Ok(Plan::Update {
             id: t.id.clone(),
             name: t.name.clone(),
@@ -360,9 +390,23 @@ mod tests {
         );
         // Fixed preset chosen for another site's cookies.
         assert!(plan_file(Some("bjshare"), &netscape("aither.cc"), &[]).is_err());
-        // Generic type chosen for a site that has its own preset.
-        assert!(plan_file(Some("unit3d"), &netscape("bj-share.info"), &[]).is_err());
-        assert!(plan_file(Some("unit3d"), &netscape("privatehd.to"), &[]).is_err());
+        // A generic type is only the fallback: sites with their own preset keep it.
+        assert!(matches!(
+            plan_file(Some("unit3d"), &netscape("bj-share.info"), &[]).unwrap(),
+            Plan::Create {
+                kind: "bjshare",
+                ..
+            }
+        ));
+        assert!(matches!(
+            plan_file(Some("unit3d"), &netscape("privatehd.to"), &[]).unwrap(),
+            Plan::Create {
+                kind: "avistaz",
+                ..
+            }
+        ));
+        // A fixed preset chosen for another known site is still an error.
+        assert!(plan_file(Some("bjshare"), &netscape("privatehd.to"), &[]).is_err());
         assert!(plan_file(Some("avistaz"), &netscape("cinemaz.to"), &[]).is_ok());
         // API-token-only preset.
         assert!(plan_file(Some("anthelion"), &netscape("anthelion.me"), &[]).is_err());
@@ -402,5 +446,70 @@ mod tests {
             plan_file(Some("nexusphp"), &netscape("aither.cc"), &existing).unwrap(),
             Plan::Create { .. }
         ));
+    }
+
+    #[test]
+    fn exact_host_wins_over_parent_domain() {
+        let db = Database::open_in_memory().unwrap();
+        let mk = |name: &str, url: &str| {
+            db.create_tracker(
+                CreateTrackerRequest {
+                    name: name.into(),
+                    kind: "unit3d".into(),
+                    base_url: None,
+                    enabled: true,
+                    check_interval_secs: None,
+                    mark_as_read: None,
+                    cookies_raw: String::new(),
+                    api_token: String::new(),
+                    ignore_patterns: vec![],
+                },
+                url.into(),
+            )
+            .unwrap()
+        };
+        // Parent created first, so a first-match lookup would pick it.
+        mk("Parent", "https://example.net");
+        let child = mk("Child", "https://pt.example.net");
+        let existing = db.list_trackers().unwrap();
+        assert_eq!(
+            plan_file(Some("unit3d"), &netscape("pt.example.net"), &existing).unwrap(),
+            Plan::Update {
+                id: child.id,
+                name: "Child".into()
+            }
+        );
+        // www.example.net only relates to the parent: unambiguous, so it is updated.
+        assert!(matches!(
+            plan_file(Some("unit3d"), &netscape("www.example.net"), &existing).unwrap(),
+            Plan::Update { name, .. } if name == "Parent"
+        ));
+    }
+
+    #[test]
+    fn ambiguous_related_hosts_are_rejected() {
+        let db = Database::open_in_memory().unwrap();
+        for (name, url) in [
+            ("A", "https://a.example.net"),
+            ("B", "https://b.example.net"),
+        ] {
+            db.create_tracker(
+                CreateTrackerRequest {
+                    name: name.into(),
+                    kind: "unit3d".into(),
+                    base_url: None,
+                    enabled: true,
+                    check_interval_secs: None,
+                    mark_as_read: None,
+                    cookies_raw: String::new(),
+                    api_token: String::new(),
+                    ignore_patterns: vec![],
+                },
+                url.into(),
+            )
+            .unwrap();
+        }
+        let existing = db.list_trackers().unwrap();
+        assert!(plan_file(Some("unit3d"), &netscape("example.net"), &existing).is_err());
     }
 }

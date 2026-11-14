@@ -1012,7 +1012,7 @@ mod tests {
                     .header("x-csrf-token", &csrf)
                     .header("content-type", "application/json")
                     .body(Body::from(
-                        r#"{"name":"Valid","kind":"unit3d","base_url":"https://tracker.example","cookies_raw":"Cookie: pass=topsecret","api_token":"tok123"}"#,
+                        r#"{"name":"Valid","kind":"unit3d","base_url":"https://93.184.216.34","cookies_raw":"Cookie: pass=topsecret","api_token":"tok123"}"#,
                     ))
                     .unwrap(),
             )

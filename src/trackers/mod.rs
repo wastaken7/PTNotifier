@@ -42,6 +42,12 @@ impl fmt::Display for TrackerError {
 
 impl std::error::Error for TrackerError {}
 
+/// A transport error without its request URL: tracker URLs can carry API keys or passkeys
+/// (e.g. Anthelion's `api_key`), and these messages end up in logs and error alerts.
+pub(crate) fn net_error(context: &str, e: reqwest::Error) -> TrackerError {
+    TrackerError::Network(format!("{context}: {}", e.without_url()))
+}
+
 pub static TRACKER_PRESETS: &[TrackerPreset] = &[
     TrackerPreset {
         kind: "unit3d",
@@ -381,6 +387,7 @@ impl TrackerContext {
             .cookie_provider(jar)
             .timeout(timeout)
             .redirect(crate::security::safe_redirect_policy())
+            .dns_resolver(Arc::new(crate::security::SsrfSafeResolver))
             .build()
             .map_err(|e| TrackerError::Config(format!("failed to build HTTP client: {e}")))?;
 
@@ -419,13 +426,13 @@ impl TrackerContext {
             .get(url)
             .send()
             .await
-            .map_err(|e| TrackerError::Network(format!("{context}: {e}")))?;
+            .map_err(|e| net_error(context, e))?;
 
         let status = resp.status();
         let body = resp
             .text()
             .await
-            .map_err(|e| TrackerError::Network(format!("{context} body read: {e}")))?;
+            .map_err(|e| net_error(&format!("{context} body read"), e))?;
 
         if !status.is_success() {
             if status.as_u16() == 401 || status.as_u16() == 403 {
@@ -532,5 +539,26 @@ pub async fn mark_item_read(ctx: &TrackerContext, item: &NotificationItem) {
         && let Some(url) = &item.mark_read_url
     {
         unit3d::mark_notification_read(ctx, url).await;
+    }
+}
+
+#[cfg(test)]
+mod net_error_tests {
+    use super::net_error;
+
+    #[tokio::test]
+    async fn transport_errors_do_not_leak_the_url() {
+        // Port 9 on loopback refuses the connection, so this fails without leaving the machine.
+        let err = reqwest::Client::new()
+            .get("http://127.0.0.1:9/api.php?api_key=SECRET_KEY")
+            .send()
+            .await
+            .unwrap_err();
+        assert!(
+            format!("{err}").contains("SECRET_KEY"),
+            "precondition: reqwest includes the URL"
+        );
+        let msg = net_error("Anthelion", err).to_string();
+        assert!(!msg.contains("SECRET_KEY"), "{msg}");
     }
 }

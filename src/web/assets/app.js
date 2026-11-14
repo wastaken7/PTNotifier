@@ -966,6 +966,9 @@ function initImportDialog() {
 
   $("#import-form").addEventListener("submit", async (e) => {
     e.preventDefault();
+    // Read the form now: e.currentTarget is null once the handler awaits.
+    const kind = $("#imp-kind").value || null;
+    const updateExisting = e.currentTarget.elements.update_existing.checked;
     const files = ui.importFiles;
     if (!files.length) return toast("Choose at least one cookies .txt file", "error");
     if (files.length > IMPORT_MAX_FILES) return toast(`At most ${IMPORT_MAX_FILES} files per import`, "error");
@@ -982,7 +985,7 @@ function initImportDialog() {
         if (payloadFiles.length) {
           const res = await api("/api/trackers/import", {
             method: "POST",
-            body: { kind: $("#imp-kind").value || null, update_existing: e.currentTarget.update_existing.checked, files: payloadFiles },
+            body: { kind, update_existing: updateExisting, files: payloadFiles },
           });
           results = res.results.concat(tooLarge);
         }
@@ -1051,15 +1054,23 @@ function feedQuery() {
   return params;
 }
 
+let feedRequest = 0;
+
 async function loadFeed() {
   const params = feedQuery();
   params.set("limit", String(state.feedLimit));
+  // Filters can change while a request is in flight; only the latest one may update the feed.
+  const seq = ++feedRequest;
+  let feed;
   try {
-    state.feed = await api(`/api/notifications?${params}`);
+    feed = await api(`/api/notifications?${params}`);
   } catch (err) {
-    state.feed = [];
+    if (seq !== feedRequest) return;
+    feed = [];
     fail("Could not load notifications")(err);
   }
+  if (seq !== feedRequest) return;
+  state.feed = feed;
   const rss = feedQuery();
   $("#rss-link").href = rss.toString() ? `/rss?${rss}` : "/rss";
   renderFeed();
@@ -1145,6 +1156,18 @@ function renderFeed() {
     );
   }
   feed.replaceChildren(...out);
+  revealClippedBodies();
+}
+
+/** Shows "Show more" under bodies the 3-line clamp actually cuts off. */
+function revealClippedBodies() {
+  requestAnimationFrame(() => {
+    for (const body of $$("#notif-feed .item-body")) {
+      const btn = body.nextElementSibling;
+      if (!btn || body.classList.contains("open")) continue;
+      btn.hidden = body.scrollHeight <= body.clientHeight + 1;
+    }
+  });
 }
 
 function feedItem(n) {
@@ -1153,11 +1176,12 @@ function feedItem(n) {
   const body = stripTags(n.body);
   const unseen = n.id > ui.highlightAbove;
   const bodyEl = body ? h("div", { class: "item-body", text: body }) : null;
-  const more =
-    body && (body.length > 260 || body.split("\n").length > 3)
+  // Shown by revealClippedBodies() only when the text is actually clipped at this width.
+  const more = body
       ? h("button", {
           type: "button",
           class: "link-btn",
+          hidden: true,
           text: "Show more",
           onclick: (e) => {
             const open = bodyEl.classList.toggle("open");
@@ -1203,6 +1227,11 @@ function initNotifications() {
     loadFeed();
   });
   $("#notif-search").addEventListener("input", renderFeed);
+  let resizeTimer;
+  window.addEventListener("resize", () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => ui.view === "notifications" && revealClippedBodies(), 150);
+  });
   $("#btn-refresh-notifs").addEventListener("click", (e) => withBusy(e.currentTarget, loadFeed));
 }
 

@@ -441,8 +441,15 @@ pub fn split_telegram_html(html: &str, limit: usize) -> Vec<String> {
             continue;
         }
 
-        let (unit, width) = match rest.find(';') {
-            Some(semi) if rest.starts_with('&') && semi <= 10 => (&rest[..=semi], 1),
+        // Look for an entity's ';' only after '&', and only within entity length, so plain
+        // text isn't rescanned to the end on every character (quadratic on long messages).
+        let entity_end = if rest.starts_with('&') {
+            rest.as_bytes().iter().take(11).position(|&b| b == b';')
+        } else {
+            None
+        };
+        let (unit, width) = match entity_end {
+            Some(semi) => (&rest[..=semi], 1),
             _ => {
                 let c = rest.chars().next().unwrap();
                 (&rest[..c.len_utf8()], c.len_utf16())

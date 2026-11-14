@@ -24,6 +24,63 @@ pub fn allow_private_networks() -> bool {
     ALLOW_PRIVATE_NETWORKS.load(Ordering::Relaxed)
 }
 
+/// DNS resolver for every outbound client. Unless private networks are allowed, it drops
+/// forbidden addresses from each lookup, and the connection is made only to the addresses
+/// that remain. Checking at connect time (not just when a URL is saved, or before a
+/// redirect) is what stops DNS rebinding and public hostnames pointing at 127.0.0.1 or
+/// cloud metadata. URLs with IP literals don't go through DNS and are checked by
+/// `validate_outbound_url` instead.
+#[derive(Debug, Default, Clone, Copy)]
+pub struct SsrfSafeResolver;
+
+impl reqwest::dns::Resolve for SsrfSafeResolver {
+    fn resolve(&self, name: reqwest::dns::Name) -> reqwest::dns::Resolving {
+        let host = name.as_str().to_string();
+        Box::pin(async move {
+            let addrs: Vec<std::net::SocketAddr> =
+                tokio::net::lookup_host((host.as_str(), 0)).await?.collect();
+            let allowed = filter_resolved(&host, addrs, allow_private_networks())?;
+            Ok(Box::new(allowed.into_iter()) as reqwest::dns::Addrs)
+        })
+    }
+}
+
+/// Keeps the addresses a connection may use; errors when none are left.
+fn filter_resolved(
+    host: &str,
+    addrs: Vec<std::net::SocketAddr>,
+    allow_private: bool,
+) -> std::result::Result<Vec<std::net::SocketAddr>, Box<dyn std::error::Error + Send + Sync>> {
+    if allow_private {
+        return Ok(addrs);
+    }
+    let blocked = addrs
+        .iter()
+        .find(|a| is_forbidden_ip(a.ip()))
+        .map(|a| a.ip());
+    let allowed: Vec<_> = addrs
+        .into_iter()
+        .filter(|a| !is_forbidden_ip(a.ip()))
+        .collect();
+    if allowed.is_empty() {
+        return Err(match blocked {
+            Some(ip) => format!(
+                "Refusing to connect to '{host}': it resolves to the private/local address {ip} (start with --allow-private-networks to permit this)"
+            ),
+            None => format!("'{host}' did not resolve to any address"),
+        }
+        .into());
+    }
+    Ok(allowed)
+}
+
+/// Lowercased host without IPv6 brackets or a trailing root dot (`localhost.` is `localhost`).
+fn normalized_host(host: &str) -> String {
+    host.trim_matches(|c| c == '[' || c == ']')
+        .trim_end_matches('.')
+        .to_ascii_lowercase()
+}
+
 pub fn safe_redirect_policy() -> reqwest::redirect::Policy {
     reqwest::redirect::Policy::custom(|attempt| {
         if attempt.previous().len() >= 10 {
@@ -463,7 +520,9 @@ pub fn validate_outbound_url(
     let Some(host_str) = parsed.host_str() else {
         bail!("URL must include a valid host");
     };
-    let host_lower = host_str.trim_matches(|c| c == '[' || c == ']').to_ascii_lowercase();
+    // Without the trailing dot, `localhost.` or `metadata.google.internal.` would slip past
+    // the name checks below.
+    let host_lower = normalized_host(host_str);
 
     if let Some(allowed) = allowed_hosts
         && !allowed.iter().any(|h| *h == host_lower)
@@ -509,18 +568,22 @@ pub async fn validate_outbound_url_with_dns(
     if allow_private {
         return Ok(parsed);
     }
+    // Early, readable feedback when a URL is saved. The real guarantee is SsrfSafeResolver,
+    // which re-checks every connection (DNS answers can change after this check).
     if let Some(host) = parsed.host_str() {
-        let host_clean = host.trim_matches(|c| c == '[' || c == ']');
+        let host_clean = normalized_host(host);
         if host_clean.parse::<IpAddr>().is_err() {
             let port = parsed.port_or_known_default().unwrap_or(443);
-            if let Ok(addrs) = tokio::net::lookup_host((host_clean, port)).await {
-                for addr in addrs {
-                    if is_forbidden_ip(addr.ip()) {
-                        bail!(
-                            "Refusing host '{host_clean}' resolving to forbidden IP {}",
-                            addr.ip()
-                        );
-                    }
+            // A failed lookup is not proof of safety: reject rather than skip the check.
+            let addrs = tokio::net::lookup_host((host_clean.as_str(), port))
+                .await
+                .with_context(|| format!("Could not resolve '{host_clean}'"))?;
+            for addr in addrs {
+                if is_forbidden_ip(addr.ip()) {
+                    bail!(
+                        "Refusing host '{host_clean}' resolving to forbidden IP {}",
+                        addr.ip()
+                    );
                 }
             }
         }
@@ -641,6 +704,56 @@ mod tests {
         assert!(hash.starts_with("$argon2id$"));
         assert!(verify_password("correct-horse-battery-staple", &hash));
         assert!(!verify_password("wrong-password", &hash));
+    }
+
+    #[test]
+    fn trailing_dot_hostnames_are_still_blocked() {
+        for url in [
+            "http://localhost.:8085/api/overview",
+            "http://LOCALHOST./",
+            "http://metadata.google.internal./computeMetadata/v1/",
+            "http://printer.local./",
+        ] {
+            assert!(
+                validate_outbound_url(url, false, false, None).is_err(),
+                "{url}"
+            );
+        }
+        assert!(validate_outbound_url("https://example.org./", false, false, None).is_ok());
+    }
+
+    #[test]
+    fn resolver_keeps_only_public_addresses() {
+        let addr = |s: &str| s.parse::<std::net::SocketAddr>().unwrap();
+        // Mixed answer: the private address is dropped, the public one is used.
+        let kept = filter_resolved(
+            "mixed.example",
+            vec![addr("127.0.0.1:0"), addr("93.184.216.34:0")],
+            false,
+        )
+        .unwrap();
+        assert_eq!(kept, vec![addr("93.184.216.34:0")]);
+        // Only forbidden addresses (rebinding to loopback / metadata): refuse to connect.
+        assert!(filter_resolved("evil.example", vec![addr("127.0.0.1:0")], false).is_err());
+        assert!(filter_resolved("evil.example", vec![addr("169.254.169.254:0")], false).is_err());
+        assert!(filter_resolved("evil.example", vec![addr("[::1]:0")], false).is_err());
+        // --allow-private-networks keeps everything (local Gotify/ntfy).
+        assert_eq!(
+            filter_resolved("gotify.lan", vec![addr("192.168.1.5:0")], true)
+                .unwrap()
+                .len(),
+            1
+        );
+    }
+
+    #[tokio::test]
+    async fn dns_validation_rejects_unresolvable_hosts() {
+        // `.invalid` is reserved and never resolves (RFC 2606).
+        assert!(
+            validate_outbound_url_with_dns("https://does-not-exist.invalid/", false, false)
+                .await
+                .is_err()
+        );
     }
 
     #[test]

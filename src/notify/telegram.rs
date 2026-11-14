@@ -107,10 +107,29 @@ pub async fn send(
             payload["message_thread_id"] = json!(tid);
         }
 
-        let resp = client.post(&url).json(&payload).send().await?;
-        if !resp.status().is_success() {
+        // Telegram allows about one message per second per chat: pace multi-part messages
+        // so later parts are not throttled.
+        if idx > 0 {
+            tokio::time::sleep(TELEGRAM_PART_GAP).await;
+        }
+
+        // On 429, wait as told and resend this same part, so a throttled multi-part message
+        // resumes where it stopped instead of being retried (and duplicated) from part 1.
+        let mut throttled = 0;
+        loop {
+            let resp = client.post(&url).json(&payload).send().await?;
             let status = resp.status();
+            if status.is_success() {
+                break;
+            }
             let body = resp.text().await.unwrap_or_default();
+            if status == reqwest::StatusCode::TOO_MANY_REQUESTS
+                && throttled < TELEGRAM_MAX_THROTTLE_RETRIES
+            {
+                throttled += 1;
+                tokio::time::sleep(retry_after(&body)).await;
+                continue;
+            }
             return Err(anyhow!(
                 "Telegram returned HTTP {status} (part {}/{}): {body}",
                 idx + 1,
@@ -119,6 +138,22 @@ pub async fn send(
         }
     }
     Ok(())
+}
+
+const TELEGRAM_PART_GAP: std::time::Duration = std::time::Duration::from_millis(1100);
+const TELEGRAM_MAX_THROTTLE_RETRIES: u32 = 3;
+const TELEGRAM_MAX_RETRY_AFTER_SECS: u64 = 60;
+
+/// Reads `parameters.retry_after` from a 429 body (falls back to a few seconds, capped).
+fn retry_after(body: &str) -> std::time::Duration {
+    let secs = serde_json::from_str::<serde_json::Value>(body)
+        .ok()
+        .and_then(|v| {
+            v.pointer("/parameters/retry_after")
+                .and_then(|s| s.as_u64())
+        })
+        .unwrap_or(3);
+    std::time::Duration::from_secs(secs.clamp(1, TELEGRAM_MAX_RETRY_AFTER_SECS))
 }
 
 /// Whether a chunk still has non-whitespace text once tags are removed (Telegram rejects empty messages).
@@ -135,4 +170,21 @@ fn has_visible_text(chunk: &str) -> bool {
         }
         _ => !in_tag && !c.is_whitespace(),
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::retry_after;
+    use std::time::Duration;
+
+    #[test]
+    fn retry_after_reads_and_caps_the_hint() {
+        let body = r#"{"ok":false,"error_code":429,"parameters":{"retry_after":7}}"#;
+        assert_eq!(retry_after(body), Duration::from_secs(7));
+        assert_eq!(
+            retry_after(r#"{"parameters":{"retry_after":9999}}"#),
+            Duration::from_secs(60)
+        );
+        assert_eq!(retry_after("not json"), Duration::from_secs(3));
+    }
 }

@@ -1,5 +1,5 @@
 use crate::models::{ItemType, NotificationItem};
-use crate::trackers::{TrackerContext, TrackerError, sel, text_clean};
+use crate::trackers::{TrackerContext, TrackerError, net_error, sel, text_clean};
 use regex::Regex;
 use scraper::Html;
 use serde_json::Value;
@@ -62,7 +62,8 @@ async fn parse_gazelle_table(
             let Some(message_id) = raw_id.filter(|s| !s.is_empty()) else {
                 continue;
             };
-            if ctx.is_processed(&message_id) {
+            let item_id = qualified_id(&message_id, is_staff);
+            if ctx.is_processed(&item_id) {
                 continue;
             }
 
@@ -94,7 +95,7 @@ async fn parse_gazelle_table(
 
             items.push(NotificationItem {
                 item_type: ItemType::Message,
-                id: message_id,
+                id: item_id,
                 title: None,
                 subject: Some(subject.clone()),
                 sender: Some(sender),
@@ -164,7 +165,8 @@ async fn parse_gpw_table(
                 .attr("id")
                 .unwrap_or_default()
                 .replace("message", "");
-            if message_id.is_empty() || ctx.is_processed(&message_id) {
+            let item_id = qualified_id(&message_id, is_staff);
+            if message_id.is_empty() || ctx.is_processed(&item_id) {
                 continue;
             }
 
@@ -181,7 +183,7 @@ async fn parse_gpw_table(
 
             items.push(NotificationItem {
                 item_type: ItemType::Message,
-                id: message_id.clone(),
+                id: item_id,
                 title: None,
                 subject: Some(subject.clone()),
                 sender: Some(sender),
@@ -207,24 +209,31 @@ pub async fn fetch_orpheus(ctx: &mut TrackerContext) -> Result<Vec<NotificationI
         .client
         .get(&url)
         .header("Accept", "application/json")
-        .header("Authorization", format!("token {}", ctx.config.api_token.trim()))
+        .header(
+            "Authorization",
+            format!("token {}", ctx.config.api_token.trim()),
+        )
         .send()
         .await
-        .map_err(|e| TrackerError::Network(format!("Orpheus inbox: {e}")))?;
+        .map_err(|e| net_error("Orpheus inbox", e))?;
 
     let status = resp.status();
     let text = resp
         .text()
         .await
-        .map_err(|e| TrackerError::Network(format!("Orpheus read: {e}")))?;
+        .map_err(|e| net_error("Orpheus read", e))?;
     if !status.is_success() {
-        return Err(TrackerError::CookieExpired(format!("Orpheus HTTP {status}")));
+        return Err(TrackerError::CookieExpired(format!(
+            "Orpheus HTTP {status}"
+        )));
     }
 
-    let data: Value =
-        serde_json::from_str(&text).map_err(|e| TrackerError::Parse(format!("Orpheus JSON: {e}")))?;
+    let data: Value = serde_json::from_str(&text)
+        .map_err(|e| TrackerError::Parse(format!("Orpheus JSON: {e}")))?;
     if data.get("status").and_then(|v| v.as_str()) != Some("success") {
-        return Err(TrackerError::CookieExpired("Orpheus API returned non-success".into()));
+        return Err(TrackerError::CookieExpired(
+            "Orpheus API returned non-success".into(),
+        ));
     }
 
     let messages = data
@@ -384,4 +393,27 @@ pub async fn fetch_anthelion(ctx: &mut TrackerContext) -> Result<Vec<Notificatio
     }
 
     Ok(items)
+}
+
+/// Inbox and staff-inbox messages are numbered separately on some Gazelle installs, so a
+/// staff ID gets a prefix to keep it from colliding with a normal message in the shared
+/// processed set. Normal IDs stay bare so existing state remains valid.
+fn qualified_id(message_id: &str, is_staff: bool) -> String {
+    if is_staff {
+        format!("staff_{message_id}")
+    } else {
+        message_id.to_string()
+    }
+}
+
+#[cfg(test)]
+mod qualified_id_tests {
+    use super::qualified_id;
+
+    #[test]
+    fn staff_ids_do_not_collide_with_inbox_ids() {
+        assert_eq!(qualified_id("42", false), "42");
+        assert_eq!(qualified_id("42", true), "staff_42");
+        assert_ne!(qualified_id("42", false), qualified_id("42", true));
+    }
 }

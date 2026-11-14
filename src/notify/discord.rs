@@ -100,6 +100,8 @@ pub async fn send(
     }
 
     let payload = json!({ "embeds": [embed] });
+    let webhook_url = with_wait(webhook_url)?;
+    let webhook_url = webhook_url.as_str();
 
     let resp = if let Some(bytes) = png_bytes {
         let form = multipart::Form::new()
@@ -121,4 +123,41 @@ pub async fn send(
         return Err(anyhow!("Discord returned HTTP {status}: {text}"));
     }
     Ok(())
+}
+
+/// Forces `wait=true`: without it Discord may answer before the message is saved,
+/// and the item would be marked delivered even if it never appears.
+fn with_wait(webhook_url: &str) -> Result<url::Url> {
+    let mut url = url::Url::parse(webhook_url)
+        .map_err(|_| anyhow!("Discord webhook_url is not a valid URL"))?;
+    let kept: Vec<(String, String)> = url
+        .query_pairs()
+        .filter(|(k, _)| k != "wait")
+        .map(|(k, v)| (k.into_owned(), v.into_owned()))
+        .collect();
+    url.query_pairs_mut()
+        .clear()
+        .extend_pairs(kept)
+        .append_pair("wait", "true");
+    Ok(url)
+}
+
+#[cfg(test)]
+mod wait_tests {
+    use super::with_wait;
+
+    #[test]
+    fn adds_or_overrides_wait() {
+        let base = "https://discord.com/api/webhooks/1/abc";
+        assert_eq!(
+            with_wait(base).unwrap().as_str(),
+            format!("{base}?wait=true")
+        );
+        assert_eq!(
+            with_wait(&format!("{base}?thread_id=9&wait=false"))
+                .unwrap()
+                .as_str(),
+            format!("{base}?thread_id=9&wait=true")
+        );
+    }
 }

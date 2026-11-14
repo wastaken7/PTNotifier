@@ -93,9 +93,15 @@ pub async fn fetch_items(
         let mut msgs = if hawke_uno {
             parse_hawke_messages(&html, ctx)
         } else {
-            parse_unit3d_messages(&html, ctx)
+            let (msgs, migrated) = parse_unit3d_messages(&html, ctx);
+            for id in migrated {
+                ctx.mark_processed(&id);
+            }
+            msgs
         };
-        if !hawke_uno {
+        // Opening a UNIT3D conversation marks it read, so only fetch bodies when the user
+        // asked for that, and never while seeding (seeded items aren't delivered).
+        if !hawke_uno && ctx.state.initialized && ctx.should_mark_as_read() {
             for m in &mut msgs {
                 if let Ok(body_html) = ctx.fetch_page(&m.url, "message body", None).await {
                     let doc = Html::parse_document(&body_html);
@@ -157,9 +163,12 @@ fn parse_unit3d_notifications(html: &str, ctx: &TrackerContext) -> Vec<Notificat
     items
 }
 
-fn parse_unit3d_messages(html: &str, ctx: &TrackerContext) -> Vec<NotificationItem> {
+/// Unread conversations, plus the new-style IDs of conversations already seen under a
+/// legacy (bare) ID, which the caller marks processed.
+fn parse_unit3d_messages(html: &str, ctx: &TrackerContext) -> (Vec<NotificationItem>, Vec<String>) {
     let doc = Html::parse_document(html);
     let mut items = Vec::new();
+    let mut migrated = Vec::new();
 
     for row in doc.select(&sel("tr")) {
         if row.select(&sel("i.text-red")).next().is_none() {
@@ -181,8 +190,31 @@ fn parse_unit3d_messages(html: &str, ctx: &TrackerContext) -> Vec<NotificationIt
             .rsplit('/')
             .next()
             .unwrap_or(&abs_url);
-        let msg_id = format!("msg_{id_part}");
+        // A conversation keeps its URL across replies, so key each update by the
+        // conversation plus its reply count (or, failing that, its updated_at timestamp):
+        // a new reply yields a new item instead of being skipped forever.
+        let version = Some(text_clean(cols[3]))
+            .filter(|c| !c.is_empty() && c.chars().all(|ch| ch.is_ascii_digit()))
+            .or_else(|| {
+                cols[2]
+                    .select(&sel("time[datetime]"))
+                    .next()
+                    .and_then(|t| t.value().attr("datetime"))
+                    .map(str::to_string)
+            });
+        let legacy_id = format!("msg_{id_part}");
+        let msg_id = match &version {
+            Some(v) => format!("{legacy_id}@{v}"),
+            None => legacy_id.clone(),
+        };
         if ctx.is_processed(&msg_id) {
+            continue;
+        }
+        // Older versions stored the bare conversation ID: treat that as this version
+        // already seen (it is re-keyed by `fetch_items`), rather than re-notifying every
+        // unread conversation once after upgrading.
+        if msg_id != legacy_id && ctx.is_processed(&legacy_id) {
+            migrated.push(msg_id);
             continue;
         }
 
@@ -200,7 +232,7 @@ fn parse_unit3d_messages(html: &str, ctx: &TrackerContext) -> Vec<NotificationIt
             mark_read_url: None,
         });
     }
-    items
+    (items, migrated)
 }
 
 fn parse_hawke_notifications(html: &str, ctx: &TrackerContext) -> Vec<NotificationItem> {
@@ -315,6 +347,78 @@ pub async fn mark_notification_read(ctx: &TrackerContext, action_url: &str) {
         .send()
         .await;
     if let Err(e) = res {
-        warn!(tracker = %ctx.config.name, "Failed to mark UNIT3D notification as read: {e}");
+        warn!(tracker = %ctx.config.name, "Failed to mark UNIT3D notification as read: {}", e.without_url());
+    }
+}
+
+#[cfg(test)]
+mod conversation_tests {
+    use super::parse_unit3d_messages;
+    use crate::models::{GlobalSettings, TrackerConfig, TrackerState, TrackerStatus};
+    use crate::trackers::TrackerContext;
+    use std::sync::Arc;
+    use std::time::Instant;
+    use tokio::sync::Mutex;
+
+    fn ctx(processed: &[&str]) -> TrackerContext {
+        let config = TrackerConfig {
+            id: "t".into(),
+            name: "T".into(),
+            kind: "unit3d".into(),
+            base_url: "https://u3d.example".into(),
+            enabled: true,
+            check_interval_secs: None,
+            mark_as_read: None,
+            cookies_raw: String::new(),
+            api_token: String::new(),
+            ignore_patterns: vec![],
+            state: TrackerState {
+                processed_ids: processed.iter().map(|s| s.to_string()).collect(),
+                initialized: true,
+                ..Default::default()
+            },
+            last_status: TrackerStatus::Ok,
+            last_error: None,
+            last_checked_at: None,
+            next_check_at: None,
+            created_at: String::new(),
+        };
+        TrackerContext::new(
+            config,
+            GlobalSettings::default(),
+            Arc::new(Mutex::new(Instant::now())),
+        )
+        .unwrap()
+    }
+
+    fn inbox(replies: u32) -> String {
+        format!(
+            r#"<table><tr>
+                <td>alice</td>
+                <td><a href="https://u3d.example/users/me/conversations/42">Hello</a></td>
+                <td><time datetime="2026-11-13 10:00:00">1 hour ago</time></td>
+                <td>{replies}</td>
+                <td><i class="fas fa-times text-red" title="unread"></i></td>
+                <td></td>
+            </tr></table>"#
+        )
+    }
+
+    #[test]
+    fn a_new_reply_in_a_seen_conversation_is_a_new_item() {
+        let (items, migrated) = parse_unit3d_messages(&inbox(3), &ctx(&["msg_42@2"]));
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].id, "msg_42@3");
+        assert!(migrated.is_empty());
+
+        let (items, _) = parse_unit3d_messages(&inbox(3), &ctx(&["msg_42@3"]));
+        assert!(items.is_empty());
+    }
+
+    #[test]
+    fn legacy_conversation_ids_are_migrated_without_renotifying() {
+        let (items, migrated) = parse_unit3d_messages(&inbox(3), &ctx(&["msg_42"]));
+        assert!(items.is_empty());
+        assert_eq!(migrated, vec!["msg_42@3".to_string()]);
     }
 }

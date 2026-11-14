@@ -8,7 +8,21 @@ pub async fn fetch_items(ctx: &mut TrackerContext) -> Result<Vec<NotificationIte
         .fetch_page(&inbox_url, "messages", Some("torrents.php"))
         .await?;
 
-    let candidates = parse_nexusphp_inbox(&html, ctx);
+    // The inbox is paginated (20 per page by default): with more unread messages than fit on
+    // page 0, the older ones would never be seen while they stay unread. Walk the pager.
+    let mut candidates = parse_nexusphp_inbox(&html, ctx);
+    let last_page = last_inbox_page(&html).min(MAX_INBOX_PAGES - 1);
+    for page in 1..=last_page {
+        let page_url = format!("{inbox_url}&page={page}");
+        let page_html = ctx
+            .fetch_page(&page_url, "messages", Some("torrents.php"))
+            .await?;
+        for item in parse_nexusphp_inbox(&page_html, ctx) {
+            if !candidates.iter().any(|c| c.id == item.id) {
+                candidates.push(item);
+            }
+        }
+    }
     let mut items = Vec::with_capacity(candidates.len());
 
     // Opening `viewmessage` marks the PM as read on NexusPHP, so only fetch bodies when the
@@ -24,6 +38,24 @@ pub async fn fetch_items(ctx: &mut TrackerContext) -> Result<Vec<NotificationIte
     }
 
     Ok(items)
+}
+
+/// Upper bound on inbox pages read per check (page 0 included), to keep requests polite.
+const MAX_INBOX_PAGES: u32 = 10;
+
+/// Highest `page=` (0-based) linked from the unread-mailbox pager, or 0 without a pager.
+fn last_inbox_page(html: &str) -> u32 {
+    let doc = Html::parse_document(html);
+    doc.select(&sel("a[href]"))
+        .filter_map(|a| a.value().attr("href"))
+        .filter(|h| h.contains("action=viewmailbox") && h.contains("unread=yes"))
+        .filter_map(|h| {
+            h.split(['?', '&'])
+                .find_map(|kv| kv.strip_prefix("page="))
+                .and_then(|n| n.parse::<u32>().ok())
+        })
+        .max()
+        .unwrap_or(0)
 }
 
 fn parse_nexusphp_inbox(html: &str, ctx: &TrackerContext) -> Vec<NotificationItem> {
@@ -98,4 +130,21 @@ fn extract_nexusphp_body(html: &str) -> Option<String> {
         }
     }
     None
+}
+
+#[cfg(test)]
+mod pager_tests {
+    use super::last_inbox_page;
+
+    #[test]
+    fn reads_the_highest_unread_inbox_page() {
+        let html = r#"<p>
+            <a href="?action=viewmailbox&amp;box=1&amp;unread=yes&amp;page=1">2</a>
+            <a href="messages.php?action=viewmailbox&amp;box=1&amp;unread=yes&amp;page=3">4</a>
+            <a href="messages.php?action=viewmailbox&amp;box=2&amp;page=9">sent box, other filter</a>
+            <a href="torrents.php?page=50">torrents</a>
+        </p>"#;
+        assert_eq!(last_inbox_page(html), 3);
+        assert_eq!(last_inbox_page("<p>no pager</p>"), 0);
+    }
 }

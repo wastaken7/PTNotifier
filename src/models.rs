@@ -82,6 +82,11 @@ pub struct TrackerState {
 pub struct PendingDelivery {
     pub channel_ids: Vec<String>,
     pub attempts: u32,
+    /// The item itself, so a retry doesn't depend on the tracker still listing it (opening a
+    /// message to read its body marks it read on some engines, e.g. NexusPHP).
+    /// `None` for retries saved by older versions.
+    #[serde(default)]
+    pub item: Option<NotificationItem>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

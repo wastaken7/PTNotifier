@@ -355,8 +355,15 @@ mod enabled {
             #[cfg(all(unix, not(target_os = "macos")))]
             let res = Command::new("xdg-open").arg(url).spawn();
 
-            if let Err(e) = res {
-                warn!(url = %url, "Failed to open browser: {e}");
+            match res {
+                // Reap the launcher off the tray thread: a dropped Child is never waited on
+                // and would stay a zombie until PTNotifier exits.
+                Ok(mut child) => {
+                    std::thread::spawn(move || {
+                        let _ = child.wait();
+                    });
+                }
+                Err(e) => warn!(url = %url, "Failed to open browser: {e}"),
             }
         }
     }

@@ -174,6 +174,7 @@ fn build_notify_client() -> Client {
         .timeout(Duration::from_secs(20))
         .user_agent(trackers::DEFAULT_USER_AGENT)
         .redirect(security::safe_redirect_policy())
+        .dns_resolver(std::sync::Arc::new(security::SsrfSafeResolver))
         .build()
         .expect("HTTP client")
 }
@@ -336,12 +337,17 @@ fn main() -> Result<()> {
         target_os = "macos",
         feature = "tray"
     ));
-    let cmd = cli.command.unwrap_or(Commands::Serve {
-        bind: env_bind()?,
-        tray: default_tray,
-        trust_proxy: env_flag("PTN_TRUST_PROXY"),
-        allow_private_networks: env_flag("PTN_ALLOW_PRIVATE_NETWORKS"),
-    });
+    // PTN_BIND is only read for the implicit `serve`, so a bad value cannot block
+    // subcommands such as `ptn user list`.
+    let cmd = match cli.command {
+        Some(cmd) => cmd,
+        None => Commands::Serve {
+            bind: env_bind()?,
+            tray: default_tray,
+            trust_proxy: env_flag("PTN_TRUST_PROXY"),
+            allow_private_networks: env_flag("PTN_ALLOW_PRIVATE_NETWORKS"),
+        },
+    };
 
     match cmd {
         Commands::Serve {
@@ -460,12 +466,30 @@ fn main() -> Result<()> {
                 ));
 
                 info!(address = %bind_info.active, db = %db_path.display(), "PTNotifier WebUI listening");
-                axum::serve(
+                // Graceful shutdown waits for open connections, and an open /api/events
+                // stream never ends on its own: give in-flight requests a bounded drain.
+                let (signalled_tx, signalled_rx) = tokio::sync::oneshot::channel::<()>();
+                let server = axum::serve(
                     listener,
                     app.into_make_service_with_connect_info::<SocketAddr>(),
                 )
-                .with_graceful_shutdown(shutdown_signal())
-                .await?;
+                .with_graceful_shutdown(async move {
+                    shutdown_signal().await;
+                    let _ = signalled_tx.send(());
+                })
+                .into_future();
+                tokio::select! {
+                    res = server => res?,
+                    _ = async {
+                        if signalled_rx.await.is_ok() {
+                            tokio::time::sleep(SHUTDOWN_DRAIN).await;
+                        } else {
+                            std::future::pending::<()>().await;
+                        }
+                    } => {
+                        warn!("Open connections did not close in time; exiting anyway");
+                    }
+                }
                 Ok::<_, anyhow::Error>(())
             })?;
         }
@@ -636,6 +660,9 @@ fn main() -> Result<()> {
 
     Ok(())
 }
+
+/// How long `serve` waits for open connections after Ctrl+C before exiting anyway.
+const SHUTDOWN_DRAIN: Duration = Duration::from_secs(5);
 
 async fn shutdown_signal() {
     let _ = tokio::signal::ctrl_c().await;

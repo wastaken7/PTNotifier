@@ -168,15 +168,27 @@ pub async fn execute_tracker_check(
                         return Err(e.context("loading notification channels"));
                     }
                 };
-                // Forget pending retries for items the tracker no longer reports (e.g. read elsewhere).
-                let current_ids: HashSet<&str> = items.iter().map(|i| i.id.as_str()).collect();
+                // A pending retry continues even when the tracker stopped listing the item:
+                // reading its body may itself have marked it read (NexusPHP), and dropping the
+                // retry would turn a temporary channel failure into a lost notification.
+                // Retries are still capped by MAX_DELIVERY_ATTEMPTS. Old retries saved without
+                // the item can't be resent and are dropped as before.
+                let current_ids: HashSet<String> = items.iter().map(|i| i.id.clone()).collect();
                 ctx.state
                     .pending_deliveries
-                    .retain(|id, _| current_ids.contains(id.as_str()));
+                    .retain(|id, p| current_ids.contains(id) || p.item.is_some());
+                let mut work = items;
+                work.extend(
+                    ctx.state
+                        .pending_deliveries
+                        .iter()
+                        .filter(|(id, _)| !current_ids.contains(*id))
+                        .filter_map(|(_, p)| p.item.clone()),
+                );
 
                 let mut sent = 0usize;
                 let mut pending = 0usize;
-                for item in &items {
+                for item in &work {
                     if ctx.is_processed(&item.id) {
                         continue;
                     }
@@ -188,10 +200,20 @@ pub async fn execute_tracker_check(
                             info!(tracker = %tracker.name, id = %item.id, "Ignored item matching filter");
                             continue;
                         }
-                        if let Ok(entry) =
-                            db.insert_notification_history(&tracker.id, &tracker.name, item)
-                        {
-                            let _ = event_tx.send(UiEvent::NewNotification(entry));
+                        // The history is what the WebUI and RSS show: if it can't be written,
+                        // leave the item unprocessed (and unread) so the next check retries it.
+                        match db.insert_notification_history(&tracker.id, &tracker.name, item) {
+                            Ok(entry) => {
+                                let _ = event_tx.send(UiEvent::NewNotification(entry));
+                            }
+                            Err(e) => {
+                                error!(
+                                    tracker = %tracker.name,
+                                    id = %item.id,
+                                    "Could not save the notification to history; will retry on the next check: {e:#}"
+                                );
+                                continue;
+                            }
                         }
                     }
 
@@ -238,6 +260,7 @@ pub async fn execute_tracker_check(
                             PendingDelivery {
                                 channel_ids: failed,
                                 attempts,
+                                item: Some(item.clone()),
                             },
                         );
                         pending += 1;
@@ -361,22 +384,34 @@ pub fn spawn_scheduler(
         };
 
         rebuild_schedule(&mut schedule);
-        info!(active_trackers = schedule.len(), "Per-tracker scheduler started");
+        info!(
+            active_trackers = schedule.len(),
+            "Per-tracker scheduler started"
+        );
+
+        // "Check now" requests, kept apart from the automatic schedule so they also run
+        // for paused trackers.
+        let mut run_once: HashSet<String> = HashSet::new();
 
         loop {
             let now = Utc::now();
+            let requested: HashSet<String> = std::mem::take(&mut run_once);
             let mut due_ids: Vec<String> = schedule
                 .iter()
                 .filter(|(_, next)| **next <= now)
                 .map(|(id, _)| id.clone())
+                .chain(requested.iter().cloned())
+                .collect::<HashSet<_>>()
+                .into_iter()
                 .collect();
             due_ids.sort();
 
             for id in due_ids {
                 // The tracker may have been disabled (or deleted) while earlier checks ran.
+                // Disabling only stops automatic checks, not an explicit "Check now".
                 // (A lookup error is left to execute_tracker_check, which reports it.)
                 let gone_or_disabled = match db.get_tracker(&id) {
-                    Ok(Some(t)) => !t.enabled,
+                    Ok(Some(t)) => !t.enabled && !requested.contains(&id),
                     Ok(None) => true,
                     Err(_) => false,
                 };
@@ -420,7 +455,7 @@ pub fn spawn_scheduler(
                             rebuild_schedule(&mut schedule);
                         }
                         Some(SchedulerCmd::RunNow(id)) => {
-                            schedule.insert(id, Utc::now());
+                            run_once.insert(id);
                         }
                         None => break,
                     }
