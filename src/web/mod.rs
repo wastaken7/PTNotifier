@@ -142,20 +142,34 @@ pub(crate) fn require_admin(auth: &AuthContext) -> Option<AxumResponse> {
     None
 }
 
-async fn serve_index() -> Html<&'static str> {
-    Html(INDEX_HTML)
+/// The WebUI files are embedded in the binary, so they change whenever PTNotifier is
+/// upgraded. `no-cache` makes the browser revalidate instead of running a stale script
+/// against a newer API.
+const ASSET_CACHE: (header::HeaderName, &str) = (header::CACHE_CONTROL, "no-cache");
+
+async fn serve_index() -> impl IntoResponse {
+    ([ASSET_CACHE], Html(INDEX_HTML))
 }
 
 async fn serve_css() -> impl IntoResponse {
-    ([(header::CONTENT_TYPE, "text/css; charset=utf-8")], STYLE_CSS)
+    (
+        [
+            (header::CONTENT_TYPE, "text/css; charset=utf-8"),
+            ASSET_CACHE,
+        ],
+        STYLE_CSS,
+    )
 }
 
 async fn serve_js() -> impl IntoResponse {
     (
-        [(
-            header::CONTENT_TYPE,
-            "application/javascript; charset=utf-8",
-        )],
+        [
+            (
+                header::CONTENT_TYPE,
+                "application/javascript; charset=utf-8",
+            ),
+            ASSET_CACHE,
+        ],
         APP_JS,
     )
 }
