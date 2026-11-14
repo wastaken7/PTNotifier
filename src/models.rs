@@ -107,6 +107,9 @@ pub struct TrackerConfig {
     pub last_checked_at: Option<String>,
     pub next_check_at: Option<String>,
     pub created_at: String,
+    /// Bumped when the kind or base URL changes; see `Database::update_tracker_runtime`.
+    #[serde(default)]
+    pub config_rev: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

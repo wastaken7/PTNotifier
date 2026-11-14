@@ -99,6 +99,7 @@ pub async fn execute_tracker_check(
 
     if let Ok(Some(updated)) = db.update_tracker_runtime(
         tracker_id,
+        tracker.config_rev,
         TrackerStatus::Running,
         None,
         None,
@@ -117,6 +118,7 @@ pub async fn execute_tracker_check(
             let next = (now + ChronoDuration::seconds(interval_secs as i64)).to_rfc3339();
             if let Ok(Some(updated)) = db.update_tracker_runtime(
                 tracker_id,
+                tracker.config_rev,
                 TrackerStatus::Error,
                 Some(&e.to_string()),
                 Some(&now.to_rfc3339()),
@@ -157,6 +159,7 @@ pub async fn execute_tracker_check(
                         error!(tracker = %tracker.name, "{msg}");
                         if let Ok(Some(updated)) = db.update_tracker_runtime(
                             tracker_id,
+                            tracker.config_rev,
                             TrackerStatus::Error,
                             Some(&msg),
                             Some(&now_str),
@@ -280,6 +283,7 @@ pub async fn execute_tracker_check(
 
             if let Ok(Some(updated)) = db.update_tracker_runtime(
                 tracker_id,
+                tracker.config_rev,
                 TrackerStatus::Ok,
                 None,
                 Some(&now_str),
@@ -334,6 +338,7 @@ pub async fn execute_tracker_check(
 
             if let Ok(Some(updated)) = db.update_tracker_runtime(
                 tracker_id,
+                tracker.config_rev,
                 status,
                 Some(&msg),
                 Some(&now_str),

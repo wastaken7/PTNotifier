@@ -414,12 +414,27 @@ impl TrackerContext {
         *last = Instant::now();
     }
 
+    /// Applies the redirect policy's SSRF check to a URL before requesting it. Links taken
+    /// from tracker HTML can be absolute and point anywhere, including IP literals, which
+    /// never pass through `SsrfSafeResolver`.
+    pub fn check_outbound(&self, url: &str, context: &str) -> Result<(), TrackerError> {
+        crate::security::validate_outbound_url(
+            url,
+            crate::security::allow_private_networks(),
+            false,
+            None,
+        )
+        .map(|_| ())
+        .map_err(|e| TrackerError::Network(format!("{context}: blocked unsafe URL: {e}")))
+    }
+
     pub async fn fetch_page(
         &self,
         url: &str,
         context: &str,
         success_text: Option<&str>,
     ) -> Result<String, TrackerError> {
+        self.check_outbound(url, context)?;
         self.respect_rate_limit().await;
         let resp = self
             .client
@@ -560,5 +575,55 @@ mod net_error_tests {
         );
         let msg = net_error("Anthelion", err).to_string();
         assert!(!msg.contains("SECRET_KEY"), "{msg}");
+    }
+}
+
+#[cfg(test)]
+mod outbound_tests {
+    use crate::models::{GlobalSettings, TrackerConfig, TrackerState, TrackerStatus};
+    use crate::trackers::{TrackerContext, TrackerError};
+    use std::sync::Arc;
+    use std::time::Instant;
+    use tokio::sync::Mutex;
+
+    #[tokio::test]
+    async fn page_supplied_links_to_internal_addresses_are_not_requested() {
+        let config = TrackerConfig {
+            id: "t".into(),
+            name: "T".into(),
+            kind: "unit3d".into(),
+            base_url: "https://tracker.example".into(),
+            enabled: true,
+            check_interval_secs: None,
+            mark_as_read: None,
+            cookies_raw: String::new(),
+            api_token: String::new(),
+            ignore_patterns: vec![],
+            state: TrackerState::default(),
+            last_status: TrackerStatus::Ok,
+            last_error: None,
+            last_checked_at: None,
+            next_check_at: None,
+            created_at: String::new(),
+            config_rev: 0,
+        };
+        let ctx = TrackerContext::new(
+            config,
+            GlobalSettings::default(),
+            Arc::new(Mutex::new(Instant::now())),
+        )
+        .unwrap();
+        for url in [
+            "http://169.254.169.254/latest/meta-data/",
+            "http://127.0.0.1:8085/api/overview",
+            "http://[::1]/",
+            "file:///etc/passwd",
+        ] {
+            let err = ctx.fetch_page(url, "message body", None).await.unwrap_err();
+            assert!(
+                matches!(&err, TrackerError::Network(m) if m.contains("blocked unsafe URL")),
+                "{url}: {err}"
+            );
+        }
     }
 }

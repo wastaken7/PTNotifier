@@ -334,6 +334,11 @@ pub async fn mark_notification_read(ctx: &TrackerContext, action_url: &str) {
     let Some(csrf) = &ctx.state.csrf_token else {
         return;
     };
+    // `action_url` comes from the tracker's HTML.
+    if let Err(e) = ctx.check_outbound(action_url, "mark as read") {
+        warn!(tracker = %ctx.config.name, "{e}");
+        return;
+    }
     let referer = ctx
         .state
         .notifications_url
@@ -382,6 +387,7 @@ mod conversation_tests {
             last_checked_at: None,
             next_check_at: None,
             created_at: String::new(),
+            config_rev: 0,
         };
         TrackerContext::new(
             config,

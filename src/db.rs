@@ -157,8 +157,22 @@ impl Database {
             );",
         )?;
 
+        // Added after the first release: bumped whenever a tracker is pointed at another
+        // site, so a check that started before the change can't write back stale state.
+        let has_config_rev = conn
+            .prepare("SELECT 1 FROM pragma_table_info('trackers') WHERE name = 'config_rev'")?
+            .exists([])?;
+        if !has_config_rev {
+            conn.execute(
+                "ALTER TABLE trackers ADD COLUMN config_rev INTEGER NOT NULL DEFAULT 0",
+                [],
+            )?;
+        }
+
         let existing: Option<String> = conn
-            .query_row("SELECT data_json FROM settings WHERE id = 1", [], |r| r.get(0))
+            .query_row("SELECT data_json FROM settings WHERE id = 1", [], |r| {
+                r.get(0)
+            })
             .optional()?;
         if existing.is_none() {
             let defaults = serde_json::to_string(&GlobalSettings::default())?;
@@ -291,6 +305,7 @@ impl Database {
             last_checked_at: row.get(13)?,
             next_check_at: row.get(14)?,
             created_at: row.get(15)?,
+            config_rev: row.get(16)?,
         })
     }
 
@@ -299,7 +314,7 @@ impl Database {
         let mut stmt = conn.prepare(
             "SELECT id, name, kind, base_url, enabled, check_interval_secs, mark_as_read,
                     cookies_raw, api_token, ignore_patterns_json, state_json, last_status,
-                    last_error, last_checked_at, next_check_at, created_at
+                    last_error, last_checked_at, next_check_at, created_at, config_rev
              FROM trackers ORDER BY created_at ASC",
         )?;
         let mut rows = stmt.query([])?;
@@ -315,7 +330,7 @@ impl Database {
         let mut stmt = conn.prepare(
             "SELECT id, name, kind, base_url, enabled, check_interval_secs, mark_as_read,
                     cookies_raw, api_token, ignore_patterns_json, state_json, last_status,
-                    last_error, last_checked_at, next_check_at, created_at
+                    last_error, last_checked_at, next_check_at, created_at, config_rev
              FROM trackers WHERE id = ?1",
         )?;
         let mut rows = stmt.query(params![id])?;
@@ -450,7 +465,7 @@ impl Database {
         // Written only on reset, so an ordinary edit can't overwrite state a running check saved.
         if reset_state {
             conn.execute(
-                "UPDATE trackers SET state_json = ?1 WHERE id = ?2",
+                "UPDATE trackers SET state_json = ?1, config_rev = config_rev + 1 WHERE id = ?2",
                 params![serde_json::to_string(&current.state)?, id],
             )?;
         }
@@ -458,9 +473,15 @@ impl Database {
         self.get_tracker(id)
     }
 
+    /// Saves the outcome of a check. `config_rev` is the revision the check started from:
+    /// if the tracker was pointed at another site meanwhile, the check's state belongs to
+    /// the old site, so nothing is written except clearing the "running" status (the reset
+    /// state stays, and the next check seeds the new site). Returns the tracker as stored.
+    #[allow(clippy::too_many_arguments)]
     pub fn update_tracker_runtime(
         &self,
         id: &str,
+        config_rev: i64,
         status: TrackerStatus,
         last_error: Option<&str>,
         last_checked_at: Option<&str>,
@@ -469,14 +490,14 @@ impl Database {
     ) -> Result<Option<TrackerConfig>> {
         let state_json = serde_json::to_string(state)?;
         let conn = self.conn.lock().unwrap();
-        conn.execute(
+        let written = conn.execute(
             "UPDATE trackers SET
                 last_status = ?1,
                 last_error = ?2,
                 last_checked_at = COALESCE(?3, last_checked_at),
                 next_check_at = ?4,
                 state_json = ?5
-             WHERE id = ?6",
+             WHERE id = ?6 AND config_rev = ?7",
             params![
                 status.as_str(),
                 last_error,
@@ -484,8 +505,24 @@ impl Database {
                 next_check_at,
                 state_json,
                 id,
+                config_rev,
             ],
         )?;
+        if written == 0 {
+            let superseded = conn.execute(
+                "UPDATE trackers SET
+                    last_status = CASE WHEN enabled = 0 THEN 'paused' ELSE 'pending' END,
+                    last_error = NULL
+                 WHERE id = ?1",
+                params![id],
+            )?;
+            if superseded > 0 {
+                tracing::info!(
+                    tracker_id = %id,
+                    "Tracker was pointed at another site during a check; discarded that check's result"
+                );
+            }
+        }
         drop(conn);
         self.get_tracker(id)
     }
@@ -1247,8 +1284,16 @@ mod tests {
             initialized: true,
             ..Default::default()
         };
-        db.update_tracker_runtime(&t.id, TrackerStatus::Ok, None, None, None, &seeded)
-            .unwrap();
+        db.update_tracker_runtime(
+            &t.id,
+            t.config_rev,
+            TrackerStatus::Ok,
+            None,
+            None,
+            None,
+            &seeded,
+        )
+        .unwrap();
 
         let edit = |name: Option<&str>, base_url: Option<&str>| UpdateTrackerRequest {
             name: name.map(Into::into),
@@ -1279,6 +1324,101 @@ mod tests {
         assert!(!moved.state.initialized);
         assert!(moved.state.processed_ids.is_empty());
         assert!(moved.state.notifications_url.is_none());
+        assert_eq!(moved.config_rev, same.config_rev + 1);
+    }
+
+    #[test]
+    fn a_check_started_before_a_site_change_cannot_restore_old_state() {
+        let db = Database::open_in_memory().unwrap();
+        let t = db
+            .create_tracker(
+                CreateTrackerRequest {
+                    name: "T".into(),
+                    kind: "unit3d".into(),
+                    base_url: None,
+                    enabled: true,
+                    check_interval_secs: None,
+                    mark_as_read: None,
+                    cookies_raw: String::new(),
+                    api_token: String::new(),
+                    ignore_patterns: vec![],
+                },
+                "https://one.example".into(),
+            )
+            .unwrap();
+
+        // The scheduler takes its snapshot when the check starts...
+        let snapshot = db.get_tracker(&t.id).unwrap().unwrap();
+        db.update_tracker_runtime(
+            &t.id,
+            snapshot.config_rev,
+            TrackerStatus::Running,
+            None,
+            None,
+            None,
+            &snapshot.state,
+        )
+        .unwrap();
+
+        // ...the tracker is pointed at another site while the check runs...
+        let edit = UpdateTrackerRequest {
+            name: None,
+            kind: None,
+            base_url: Some("https://two.example".into()),
+            enabled: None,
+            check_interval_secs: None,
+            mark_as_read: None,
+            cookies_raw: None,
+            api_token: None,
+            clear_cookies: false,
+            clear_api_token: false,
+            ignore_patterns: None,
+        };
+        db.update_tracker(&t.id, edit).unwrap();
+
+        // ...and the check completes with state from the old site.
+        let stale = TrackerState {
+            processed_ids: vec!["old_site_item".into()],
+            initialized: true,
+            ..Default::default()
+        };
+        let after = db
+            .update_tracker_runtime(
+                &t.id,
+                snapshot.config_rev,
+                TrackerStatus::Ok,
+                None,
+                Some("now"),
+                Some("later"),
+                &stale,
+            )
+            .unwrap()
+            .unwrap();
+        assert!(
+            !after.state.initialized,
+            "the reset must survive, so the new site is seeded"
+        );
+        assert!(after.state.processed_ids.is_empty());
+        assert_eq!(
+            after.last_status,
+            TrackerStatus::Pending,
+            "no longer shown as running"
+        );
+
+        // A check started after the change writes normally.
+        let ok = db
+            .update_tracker_runtime(
+                &t.id,
+                after.config_rev,
+                TrackerStatus::Ok,
+                None,
+                None,
+                None,
+                &stale,
+            )
+            .unwrap()
+            .unwrap();
+        assert!(ok.state.initialized);
     }
 
     #[test]
@@ -1288,6 +1428,39 @@ mod tests {
         let db = Database::open(&db_path).unwrap();
         assert!(db_path.exists());
         drop(db);
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn databases_from_before_config_rev_are_migrated() {
+        let base = std::env::temp_dir().join(format!("ptn_test_{}", Uuid::new_v4()));
+        std::fs::create_dir_all(&base).unwrap();
+        let db_path = base.join("old.db");
+        {
+            // The trackers table as the first release created it, with one tracker.
+            let conn = rusqlite::Connection::open(&db_path).unwrap();
+            conn.execute_batch(
+                "CREATE TABLE trackers (
+                    id TEXT PRIMARY KEY, name TEXT NOT NULL, kind TEXT NOT NULL,
+                    base_url TEXT NOT NULL, enabled INTEGER NOT NULL DEFAULT 1,
+                    check_interval_secs INTEGER, mark_as_read INTEGER,
+                    cookies_raw TEXT NOT NULL DEFAULT '', api_token TEXT NOT NULL DEFAULT '',
+                    ignore_patterns_json TEXT NOT NULL DEFAULT '[]',
+                    state_json TEXT NOT NULL DEFAULT '{}',
+                    last_status TEXT NOT NULL DEFAULT 'pending', last_error TEXT,
+                    last_checked_at TEXT, next_check_at TEXT, created_at TEXT NOT NULL
+                );
+                INSERT INTO trackers (id, name, kind, base_url, created_at)
+                VALUES ('t1', 'Old', 'unit3d', 'https://old.example', '2026-01-01T00:00:00Z');",
+            )
+            .unwrap();
+        }
+        let db = Database::open(&db_path).unwrap();
+        let t = db.get_tracker("t1").unwrap().unwrap();
+        assert_eq!(t.config_rev, 0);
+        drop(db);
+        // Opening again must not try to add the column twice.
+        Database::open(&db_path).unwrap();
         let _ = std::fs::remove_dir_all(&base);
     }
 
