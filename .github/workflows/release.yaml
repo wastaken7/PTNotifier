@@ -41,6 +41,15 @@ jobs:
             sha="${GITHUB_SHA}"
             echo "Tag ${TAG} does not exist yet; it will be created at ${sha}."
           fi
+          # The WebUI compares the release tag with the version built into the binary,
+          # so a mismatch would show "update available" on the latest release.
+          version=$(gh api "repos/${GITHUB_REPOSITORY}/contents/Cargo.toml?ref=${sha}" \
+            -H "Accept: application/vnd.github.raw" \
+            | sed -n 's/^version *= *"\([^"]*\)".*/\1/p' | head -n1)
+          if [[ "${TAG#v}" != "$version" ]]; then
+            echo "::error::Tag ${TAG} does not match Cargo.toml version '${version}' at ${sha}. Bump the version in Cargo.toml first."
+            exit 1
+          fi
           echo "sha=${sha}" >> "$GITHUB_OUTPUT"
 
   build:
