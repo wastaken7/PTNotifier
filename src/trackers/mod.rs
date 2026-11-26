@@ -523,7 +523,52 @@ pub fn sel(s: &str) -> Selector {
     Selector::parse(s).expect("valid static CSS selector")
 }
 
+/// Rewrites relative link targets in an HTML/BBCode body (`href="log.php?..."`,
+/// `[url=torrents.php?...]`) into absolute URLs against `base`. Message bodies are delivered
+/// outside the tracker, where a relative link cannot be followed: Discord shows such a
+/// Markdown link as raw text and Telegram drops it.
+pub fn absolutize_links(body: &str, base: &str) -> String {
+    static RE_LINK: std::sync::OnceLock<regex::Regex> = std::sync::OnceLock::new();
+    let re = RE_LINK.get_or_init(|| {
+        regex::Regex::new(
+            r#"(?i)(\bhref\s*=\s*")([^"]*)(")|(\bhref\s*=\s*')([^']*)(')|(\[url=)([^\]]*)(\])"#,
+        )
+        .unwrap()
+    });
+    let Ok(base) = Url::parse(base) else {
+        return body.to_string();
+    };
+    re.replace_all(body, |c: &regex::Captures| {
+        let (pre, target, post) = [1, 4, 7]
+            .into_iter()
+            .find_map(|i| Some((c.get(i)?, c.get(i + 1)?, c.get(i + 2)?)))
+            .expect("one alternative matched");
+        let target = target.as_str();
+        let trimmed = target.trim();
+        // Only targets without a scheme are relative; leave absolute and empty ones as they are.
+        let resolved = if trimmed.is_empty()
+            || !matches!(Url::parse(trimmed), Err(url::ParseError::RelativeUrlWithoutBase))
+        {
+            target.to_string()
+        } else {
+            base.join(trimmed).map_or_else(|_| target.to_string(), String::from)
+        };
+        format!("{}{resolved}{}", pre.as_str(), post.as_str())
+    })
+    .into_owned()
+}
+
 pub async fn fetch_items(ctx: &mut TrackerContext) -> Result<Vec<NotificationItem>, TrackerError> {
+    let mut items = fetch_items_raw(ctx).await?;
+    for item in &mut items {
+        if let Some(body) = item.body.as_mut() {
+            *body = absolutize_links(body, &ctx.config.base_url);
+        }
+    }
+    Ok(items)
+}
+
+async fn fetch_items_raw(ctx: &mut TrackerContext) -> Result<Vec<NotificationItem>, TrackerError> {
     let kind = ctx.config.kind.to_lowercase();
     match kind.as_str() {
         "unit3d" => unit3d::fetch_items(ctx, false).await,
@@ -641,5 +686,28 @@ mod outbound_tests {
                 "{url}: {err}"
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod absolutize_tests {
+    use super::absolutize_links;
+    use crate::notify::format_markdown;
+
+    #[test]
+    fn relative_links_become_absolute() {
+        let body = r#"<a href="page.php?q=a+b">One</a> <a href='/other.php?x=1'>Two</a> [url=item.php?y=2]Three[/url] <a href="https://example.org/">abs</a> <a href="mailto:user@example.com">m</a>"#;
+        let out = absolutize_links(body, "https://tracker.example/");
+        assert_eq!(
+            out,
+            r#"<a href="https://tracker.example/page.php?q=a+b">One</a> <a href='https://tracker.example/other.php?x=1'>Two</a> [url=https://tracker.example/item.php?y=2]Three[/url] <a href="https://example.org/">abs</a> <a href="mailto:user@example.com">m</a>"#
+        );
+    }
+
+    #[test]
+    fn relative_html_links_render_as_working_markdown_links() {
+        let body = r#"<a href="item.php?id=1&amp;sub=2#anchor2">Item</a>"#;
+        let md = format_markdown(&absolutize_links(body, "https://tracker.example"));
+        assert_eq!(md, "[Item](https://tracker.example/item.php?id=1&sub=2#anchor2)");
     }
 }

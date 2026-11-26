@@ -9,6 +9,8 @@
 !.env.example
 .ptn_master.key
 ptnotifier.env
+CLAUDE.md
+AGENTS.md
 
 # Legacy Python version (may still exist in upgraded checkouts and hold credentials)
 config.py
