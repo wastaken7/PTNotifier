@@ -164,6 +164,24 @@ ptn [OPTIONS] [COMMAND]
   ptn test-notify --channel "Discord"
   ```
 
+### Forgot your WebUI password?
+
+The WebUI has no "forgot password" link: a password can only be reset from the command line on the machine running PTNotifier. You will be prompted for the new password (at least 10 characters), and all of that user's sessions are signed out.
+
+```bash
+ptn user passwd --username admin
+```
+
+With Docker, pass the database path explicitly (`docker exec` does not use the image's default `--db`):
+
+```bash
+docker exec -it ptnotifier ptn user passwd --db /data/ptnotifier.db --username admin
+```
+
+If you don't remember the username, run `ptn user list` (with Docker: `docker exec ptnotifier ptn user list --db /data/ptnotifier.db`).
+
+Tracker cookies and channel secrets are not affected, because they are encrypted with the master key, not the password. Changing `PTN_ADMIN_PASSWORD` does **not** reset an existing password: it is only used when the database has no users yet.
+
 ---
 
 ## Global Settings (WebUI)
