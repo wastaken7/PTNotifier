@@ -101,6 +101,11 @@
         </a>
       </nav>
 
+      <div class="version-note" id="version-note" hidden>
+        <a class="update-link" id="update-link" target="_blank" rel="noopener noreferrer" hidden></a>
+        <span class="version-current" id="version-current"></span>
+      </div>
+
       <div class="sidebar-foot">
         <div class="whoami">
           <span class="avatar" id="me-avatar" aria-hidden="true"></span>
@@ -304,6 +309,11 @@
                 <input type="checkbox" name="send_error_notifications" />
                 <span class="switch-track" aria-hidden="true"></span>
                 <span><strong>Send error alerts</strong><span class="help block">Alert channels with “Errors” enabled when a check fails or cookies expire.</span></span>
+              </label>
+              <label class="switch">
+                <input type="checkbox" name="check_for_updates" />
+                <span class="switch-track" aria-hidden="true"></span>
+                <span><strong>Check for updates</strong><span class="help block">Ask GitHub a few times a day whether a newer PTNotifier release is out, and show it in the sidebar. Nothing is installed automatically.</span></span>
               </label>
             </div>
           </fieldset>

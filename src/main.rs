@@ -295,6 +295,7 @@ fn build_app_state(
         trust_proxy: opts.trust_proxy,
         allow_private_networks: opts.allow_private_networks,
         bind: opts.bind,
+        update_cache: Default::default(),
     }
 }
 

@@ -8,6 +8,10 @@ pub struct GlobalSettings {
     pub mark_as_read: bool,
     pub send_error_notifications: bool,
     pub discord_embed_limit: usize,
+    /// Ask GitHub for newer releases and show them in the WebUI. Missing in settings
+    /// saved by older versions, so it defaults to on.
+    #[serde(default = "default_true")]
+    pub check_for_updates: bool,
 }
 
 impl Default for GlobalSettings {
@@ -19,6 +23,7 @@ impl Default for GlobalSettings {
             mark_as_read: false,
             send_error_notifications: false,
             discord_embed_limit: 4096,
+            check_for_updates: true,
         }
     }
 }

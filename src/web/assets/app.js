@@ -449,6 +449,25 @@ async function enterApp(user, csrf) {
   showView(currentRoute());
   await loadAll();
   connectEvents();
+  loadVersion();
+}
+
+/** Shows the running version and, when GitHub has a newer release, a link to it. */
+async function loadVersion() {
+  let info;
+  try {
+    info = await api("/api/version");
+  } catch {
+    return;
+  }
+  if (!state.user) return;
+  $("#version-current").textContent = `v${info.current}`;
+  const link = $("#update-link");
+  link.hidden = !info.update_available;
+  link.textContent = info.update_available ? `Update available: ${info.latest}` : "";
+  if (info.update_available && info.url) link.href = info.url;
+  else link.removeAttribute("href");
+  $("#version-note").hidden = false;
 }
 
 /** Forget everything that belongs to the account so the next person at this browser sees none of it. */
@@ -476,6 +495,7 @@ function signedOut() {
   for (const sel of ["#log-box", "#tracker-list", "#channel-grid", "#notif-feed", "#session-list", "#rss-list", "#user-list", "#imp-results", "#bind-status"]) {
     $(sel).replaceChildren();
   }
+  $("#version-note").hidden = true;
   document.body.classList.remove("is-admin");
   showAuth("login");
 }
@@ -1524,7 +1544,7 @@ function initLogs() {
 /* =========================================================================
  * Settings
  * ======================================================================= */
-const SETTING_KEYS = ["default_check_interval_secs", "request_delay_secs", "http_timeout_secs", "discord_embed_limit", "mark_as_read", "send_error_notifications"];
+const SETTING_KEYS = ["default_check_interval_secs", "request_delay_secs", "http_timeout_secs", "discord_embed_limit", "mark_as_read", "send_error_notifications", "check_for_updates"];
 
 function readSettingsForm() {
   const f = $("#settings-form");
@@ -1571,6 +1591,7 @@ function initSettings() {
       try {
         state.settings = await api("/api/settings", { method: "PUT", body: readSettingsForm() });
         renderSettings();
+        loadVersion();
         toast("Settings saved");
       } catch (err) {
         fail("Could not save settings")(err);

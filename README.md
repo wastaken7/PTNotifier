@@ -178,3 +178,4 @@ These settings can be configured through the WebUI (`/api/settings`):
 | `mark_as_read` | `false` | Mark notifications/PMs as read after processing. |
 | `send_error_notifications` | `false` | Send alerts to configured channels on tracker errors or expired cookies. |
 | `discord_embed_limit` | `4096` | Character limit for Discord embeds. |
+| `check_for_updates` | `true` | Check GitHub for a newer release (cached for 6 hours) and show it in the WebUI sidebar. Nothing is installed automatically. |

@@ -2,6 +2,7 @@ pub mod auth;
 mod import;
 mod rss;
 mod server;
+pub mod update;
 
 use crate::bind::BindInfo;
 use crate::db::Database;
@@ -59,12 +60,14 @@ pub struct AppState {
     pub trust_proxy: bool,
     pub allow_private_networks: bool,
     pub bind: BindInfo,
+    pub update_cache: update::UpdateCache,
 }
 
 pub fn router(state: AppState) -> Router {
     let protected_api = Router::new()
         .route("/api/overview", get(overview))
         .route("/api/settings", get(get_settings).put(update_settings))
+        .route("/api/version", get(update::get_version))
         .route("/api/trackers/presets", get(get_presets))
         .route("/api/trackers", get(list_trackers).post(create_tracker))
         .route(
@@ -772,6 +775,7 @@ mod tests {
                 active: crate::bind::default_bind(),
                 source: crate::bind::BindSource::Default,
             },
+            update_cache: Default::default(),
         };
         router(state)
     }
