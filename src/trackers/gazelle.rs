@@ -4,6 +4,8 @@ use regex::Regex;
 use scraper::Html;
 use serde_json::Value;
 use std::sync::OnceLock;
+use std::time::{Duration, Instant};
+use tracing::{debug, warn};
 
 pub async fn fetch_bjshare_or_brasil(
     ctx: &mut TrackerContext,
@@ -393,6 +395,240 @@ pub async fn fetch_anthelion(ctx: &mut TrackerContext) -> Result<Vec<Notificatio
     }
 
     Ok(items)
+}
+
+/// GGn allows at most five API requests every ten seconds, so its calls are spaced at least
+/// this far apart even when the global request delay is set lower.
+const GGN_MIN_REQUEST_GAP: Duration = Duration::from_secs(2);
+
+/// One GET against the GGn JSON API (`api.php?request=...`), authenticated with the
+/// `X-API-Key` header. Returns the `response` value of a `"status": "success"` reply.
+async fn ggn_get(ctx: &TrackerContext, url: &str, context: &str) -> Result<Value, TrackerError> {
+    ggn_request(ctx, url, context, None).await
+}
+
+/// A GGn API call; with `form`, it is sent as a POST with that url-encoded body.
+async fn ggn_request(
+    ctx: &TrackerContext,
+    url: &str,
+    context: &str,
+    form: Option<&[(&str, &str)]>,
+) -> Result<Value, TrackerError> {
+    ctx.check_outbound(url, context)?;
+    ctx.respect_rate_limit().await;
+    {
+        // Only waits when the global request delay is shorter than the GGn floor.
+        static LAST: OnceLock<tokio::sync::Mutex<Option<Instant>>> = OnceLock::new();
+        let mut last = LAST.get_or_init(|| tokio::sync::Mutex::new(None)).lock().await;
+        if let Some(prev) = *last {
+            let elapsed = prev.elapsed();
+            if elapsed < GGN_MIN_REQUEST_GAP {
+                tokio::time::sleep(GGN_MIN_REQUEST_GAP - elapsed).await;
+            }
+        }
+        *last = Some(Instant::now());
+    }
+    let req = match form {
+        Some(fields) => ctx.client.post(url).form(fields),
+        None => ctx.client.get(url),
+    };
+    let resp = req
+        .header("Accept", "application/json")
+        .header("X-API-Key", ctx.config.api_token.trim())
+        .send()
+        .await
+        .map_err(|e| net_error(context, e))?;
+    let status = resp.status();
+    let text = resp
+        .text()
+        .await
+        .map_err(|e| net_error(&format!("{context} body read"), e))?;
+    if status.as_u16() == 401 || status.as_u16() == 403 {
+        return Err(TrackerError::CookieExpired(format!(
+            "{context}: HTTP {status} (invalid API key or missing permission)"
+        )));
+    }
+    if !status.is_success() {
+        return Err(TrackerError::Network(format!("{context}: HTTP {status}")));
+    }
+    let data: Value = serde_json::from_str(&text)
+        .map_err(|e| TrackerError::Parse(format!("{context} JSON: {e}")))?;
+    if data.get("status").and_then(|v| v.as_str()) != Some("success") {
+        let detail = data
+            .get("error")
+            .and_then(|v| v.as_str())
+            .unwrap_or("non-success status");
+        return Err(TrackerError::CookieExpired(format!("{context}: {detail}")));
+    }
+    Ok(data.get("response").cloned().unwrap_or(Value::Null))
+}
+
+/// A JSON scalar as a string: GGn mixes numeric and string IDs between endpoints.
+fn json_str(v: Option<&Value>) -> String {
+    match v {
+        Some(Value::String(s)) => s.clone(),
+        Some(Value::Number(n)) => n.to_string(),
+        Some(Value::Bool(b)) => b.to_string(),
+        _ => String::new(),
+    }
+}
+
+pub async fn fetch_ggn(ctx: &mut TrackerContext) -> Result<Vec<NotificationItem>, TrackerError> {
+    if ctx.config.api_token.trim().is_empty() {
+        return Err(TrackerError::Config("GazelleGames API key is required".into()));
+    }
+
+    let inbox_url = ctx.join_url("api.php?request=inbox&sort=unread");
+    let inbox = ggn_get(ctx, &inbox_url, "GGn inbox").await?;
+    let conversations = inbox
+        .get("messages")
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default();
+
+    let mut items = Vec::new();
+    for conv in conversations {
+        // Our own replies also bump the date; only conversations unread for us are new.
+        // (Not a `break`: sticky conversations may be listed ahead of unread ones.)
+        if conv.get("unread").and_then(|v| v.as_bool()) != Some(true) {
+            continue;
+        }
+        let conv_id = json_str(conv.get("convId"));
+        if conv_id.is_empty() {
+            continue;
+        }
+        // A conversation keeps its ID across replies, so each update is keyed by the
+        // conversation plus the date of its latest message.
+        let date = json_str(conv.get("date"));
+        let item_id = format!("{conv_id}@{date}");
+        if ctx.is_processed(&item_id) {
+            continue;
+        }
+
+        let conv_url = ctx.join_url(&format!("api.php?request=inbox&type=viewconv&id={conv_id}"));
+        let last_msg = match ggn_get(ctx, &conv_url, "GGn conversation").await {
+            Ok(v) => v
+                .get("messages")
+                .and_then(|m| m.as_array())
+                .and_then(|arr| arr.last())
+                .cloned(),
+            Err(e) => {
+                warn!(tracker = %ctx.config.name, "{e}");
+                None
+            }
+        };
+        let body = last_msg
+            .as_ref()
+            .and_then(|m| m.get("body"))
+            .and_then(|b| b.as_str())
+            .map(str::to_string);
+        let sender = last_msg
+            .as_ref()
+            .map(|m| json_str(m.get("senderName")))
+            .filter(|s| !s.is_empty())
+            .unwrap_or_else(|| "System".to_string());
+
+        items.push(NotificationItem {
+            item_type: ItemType::Message,
+            id: item_id,
+            title: None,
+            // GGn sends subjects HTML-escaped (`&#39;`).
+            subject: Some(crate::notify::decode_html_entities(
+                conv.get("subject")
+                    .and_then(|v| v.as_str())
+                    .filter(|s| !s.is_empty())
+                    .unwrap_or("No Subject"),
+            )),
+            sender: Some(sender),
+            body,
+            date,
+            url: ctx.join_url(&format!("inbox.php?action=viewconv&id={conv_id}")),
+            is_staff: false,
+            favicon: None,
+            // Carries the conversation ID for ggn_mark_read, which POSTs it to the API.
+            mark_read_url: Some(conv_id),
+        });
+    }
+
+    // Deleted-torrent notifications need the key's Torrents permission, which is optional:
+    // a key without it still delivers PMs, so a failure here is only logged.
+    let notifs_url = ctx.join_url("api.php?request=delete_notifs&limit=50");
+    match ggn_get(ctx, &notifs_url, "GGn deleted torrent notifications").await {
+        Ok(list) => {
+            for n in list.as_array().cloned().unwrap_or_default() {
+                if !matches!(json_str(n.get("UnRead")).as_str(), "1" | "true") {
+                    continue;
+                }
+                let torrent_id = json_str(n.get("TorrentID"));
+                let delete_time = json_str(n.get("DeleteTime"));
+                if torrent_id.is_empty() {
+                    continue;
+                }
+                let item_id = format!("deleted_{torrent_id}@{delete_time}");
+                if ctx.is_processed(&item_id) {
+                    continue;
+                }
+                let name = json_str(n.get("TorrentName"));
+                let reason = json_str(n.get("DeleteReason"));
+                let note = json_str(n.get("Note"));
+                let mut body = format!("Reason: {}", if reason.is_empty() { "-" } else { &reason });
+                if !note.is_empty() {
+                    body.push_str(&format!("\nNote: {note}"));
+                }
+                let replacements: Vec<String> = n
+                    .get("ReplacementTorrents")
+                    .and_then(|v| v.as_array())
+                    .map(|a| a.iter().map(|x| json_str(Some(x))).filter(|s| !s.is_empty()).collect())
+                    .unwrap_or_default();
+                for r in &replacements {
+                    body.push_str(&format!(
+                        "\nReplacement: {}",
+                        ctx.join_url(&format!("torrents.php?torrentid={r}"))
+                    ));
+                }
+                let group_id = json_str(n.get("GroupID"));
+                let url = if group_id.is_empty() {
+                    ctx.join_url("")
+                } else {
+                    ctx.join_url(&format!("torrents.php?id={group_id}"))
+                };
+                items.push(NotificationItem {
+                    item_type: ItemType::Notification,
+                    id: item_id,
+                    title: Some(format!(
+                        "Torrent deleted: {}",
+                        if name.is_empty() { torrent_id.clone() } else { crate::notify::decode_html_entities(&name) }
+                    )),
+                    subject: None,
+                    sender: None,
+                    body: Some(body),
+                    date: delete_time,
+                    url,
+                    is_staff: false,
+                    favicon: None,
+                    mark_read_url: None,
+                });
+            }
+        }
+        // A key without the Torrents permission gets HTTP 403 "out of scope of API key" on
+        // every check; that is a setup choice, not a fault worth a warning each poll.
+        Err(TrackerError::CookieExpired(m)) if m.contains("HTTP 403") => {
+            debug!(tracker = %ctx.config.name, "{m}");
+        }
+        Err(e) => warn!(tracker = %ctx.config.name, "{e}"),
+    }
+
+    Ok(items)
+}
+
+/// Marks a conversation read. GGn only reads `messages[]` from a POST body: the same field
+/// in the query string is rejected with "No conversations specified".
+pub async fn ggn_mark_read(ctx: &TrackerContext, conv_id: &str) {
+    let url = ctx.join_url("api.php?request=inbox&type=markread");
+    let form = [("messages[]", conv_id)];
+    if let Err(e) = ggn_request(ctx, &url, "GGn mark read", Some(&form)).await {
+        warn!(tracker = %ctx.config.name, "Failed to mark GGn conversation as read: {e}");
+    }
 }
 
 /// Inbox and staff-inbox messages are numbered separately on some Gazelle installs, so a

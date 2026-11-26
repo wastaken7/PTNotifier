@@ -34,7 +34,7 @@ Built-in presets cover major tracker engines as well as individual sites:
 | **UNIT3D** | UNIT3D (Generic), Hawke-Uno (Deep Space) |
 | **AvistaZ Network** | AvistaZ, CinemaZ, PrivateHD, ExoticaZ, AnimeZ |
 | **NexusPHP** | NexusPHP (Generic), BTSCHOOL, Baozi, Lajidui, LongPT, March, PTCafe, PTFans, PTGTK, PTSKit, RailgunPT |
-| **Gazelle** | GreatPosterWall, Orpheus *(API token + optional cookies)*, Anthelion *(API token only)* |
+| **Gazelle** | GreatPosterWall, Orpheus *(API token + optional cookies)*, Anthelion *(API token only)*, GazelleGames *(API key only)* |
 | **XBTIT** | HD-Space, HD-Torrents, SportsCult |
 | **Other** | BJ-Share *(3600s minimum interval)*, BrasilTracker, Amigos Share Club (ASC), BTArg, DigitalCore, Fappaizuri, HDCiTY, IPTorrents, ImmortalSeed, SceneTime, TorrentDay, TorrentLeech, YGG Reborn |
 

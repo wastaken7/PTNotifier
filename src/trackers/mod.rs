@@ -221,6 +221,15 @@ pub static TRACKER_PRESETS: &[TrackerPreset] = &[
         notes: "API-only tracker. Only User API key is required.",
     },
     TrackerPreset {
+        kind: "gazellegames",
+        label: "GazelleGames (GGn)",
+        default_base_url: "https://gazellegames.net/",
+        custom_base_url: false,
+        auth: AuthRequirement::ApiToken,
+        min_interval_secs: 1800,
+        notes: "API-only. Create an API key in profile settings with the User permission (add Torrents to also get deleted-torrent notifications).",
+    },
+    TrackerPreset {
         kind: "hdspace",
         label: "HD-Space",
         default_base_url: "https://hd-space.org/",
@@ -527,6 +536,7 @@ pub async fn fetch_items(ctx: &mut TrackerContext) -> Result<Vec<NotificationIte
         "greatposterwall" => gazelle::fetch_gpw(ctx).await,
         "orpheus" => gazelle::fetch_orpheus(ctx).await,
         "anthelion" => gazelle::fetch_anthelion(ctx).await,
+        "gazellegames" => gazelle::fetch_ggn(ctx).await,
         "hdspace" => xbtit::fetch_items(ctx, xbtit::XbtitVariant::HdSpace).await,
         "hdtorrents" => xbtit::fetch_items(ctx, xbtit::XbtitVariant::HdTorrents).await,
         "sportscult" => xbtit::fetch_items(ctx, xbtit::XbtitVariant::SportsCult).await,
@@ -554,6 +564,12 @@ pub async fn mark_item_read(ctx: &TrackerContext, item: &NotificationItem) {
         && let Some(url) = &item.mark_read_url
     {
         unit3d::mark_notification_read(ctx, url).await;
+    }
+    // For GGn the field holds the conversation ID; the call itself is a fixed POST endpoint.
+    if kind == "gazellegames"
+        && let Some(conv_id) = &item.mark_read_url
+    {
+        gazelle::ggn_mark_read(ctx, conv_id).await;
     }
 }
 
